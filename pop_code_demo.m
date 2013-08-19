@@ -25,41 +25,70 @@ neurons_num = 41;  % number of neurons in the input populations
 %   vi      - preferred value - even distribution in the range
 %   etai    - noise value - zero mean and correlated
 
+% preallocate
+vi=[];
+fi=[];
+ri=[];
+
 % generate first population and initialize
 % zero mean noise 
 etax = randn(neurons_num, 1);
 % population standard deviation - coarse (big val) / sharp receptive field
-sigma_x = 10;
+sigma_x = 18;
 % first population range of values (+/-)
 x_pop_range = 100;
+% scaling factor for tuning curves
+bkg_firing = 10; % spk/s - background firing rate
+scaling_factor = 80; % motivated by the typical background and upper spiking rates
 % init population
 for i=1:neurons_num
     % evenly distributed preferred values in the interval
     vi(i) = -x_pop_range+(i-1)*(x_pop_range/((neurons_num-1)/2));
     % tuning curve of the neuron
-    [pts, vals] = gauss_tuning(vi(i), sigma_x, x_pop_range);
+    [pts, vals] = gauss_tuning(vi(i), ...
+                               sigma_x, ...
+                               x_pop_range, ...
+                               scaling_factor);
     fi(i).p = pts;
     fi(i).v = vals;
-    % scale the firing rate to proper values
-    fi(i).v = 2000*fi(i).v;
     x_population(i) = struct('i', i, ...
-                            'vi', vi(1),...
+                            'vi', vi(i),...
                             'fi', fi(i), ...
                             'etai', etax(i),...
-                            'ri', fi(i).v );
+                            'ri', randi([bkg_firing , scaling_factor]));
 end;
 
 % plot the tunning curves of all neurons 
 figure(1);
 for i=1:neurons_num
     plot(x_population(i).fi.p, x_population(i).fi.v);
-    hold on;
+    hold all;
 end;
-% plot the initial activity in the population 
+
+% plot the encoded value in the population
 figure(2);
+encoded_val = -23;
+% make the encoding of the value in the population and add noise
 for i=1:neurons_num
-    plot(x_population(i).fi.p, x_population(i).ri, 'o')
+    % scale the firing rate to proper values and compute fi
+    x_population(i).ri = gauss_val(encoded_val, ...
+                                   x_population(i).vi, ...
+                                   sigma_x, ...
+                                   scaling_factor) + ...
+                                   etax(i);
 end;
+% plot the noisy hill of population activity encoding the given value
+% index for neurons
+j = 1;
+for i=-x_pop_range:x_pop_range
+    % display on even spacing of the entire input domain
+    if(rem(i,(abs(vi(1))-abs(vi(2))))==0)
+        plot(i, x_population(j).ri, 'o');
+        hold all;
+        j = j+1;
+    end;
+end;
+
 
 
 
