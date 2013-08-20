@@ -1,4 +1,4 @@
-% Demo software usign population code for estimating arbitrary functions
+%% Demo software usign population code for estimating arbitrary functions
 % 
 % the setup contains 2 input populations each coding some scalar
 % (unimodal) variable which are projected onto a 2D network of units with
@@ -10,13 +10,16 @@
 % may be considered inputs / outputs and the processing happens in the
 % intermediate layer
 
-% general cleanup
+%% INITIALIZATION
 clear all;
 clc; clf;
 close all;
 
 % define the 1D populations (symmetric (size wise) populations)
-neurons_num = 41;  % number of neurons in the input populations
+neurons_num_x = 41;  % number of neurons in the input populations
+neurons_num_y = 61;
+neurons_num_z = 51;
+noise_scale = 10;
 
 % neuron information (neuron index i)
 %   i       - index in the population 
@@ -25,25 +28,27 @@ neurons_num = 41;  % number of neurons in the input populations
 %   vi      - preferred value - even distribution in the range
 %   etai    - noise value - zero mean and correlated
 
+% scaling factor for tuning curves
+bkg_firing = 10; % spk/s - background firing rate
+scaling_factor = 80; % motivated by the typical background and upper spiking rates
+
+%% generate first population and initialize
 % preallocate
 vi=[];
 fi=[];
 ri=[];
-
-% generate first population and initialize
 % zero mean noise 
-etax = randn(neurons_num, 1);
+etax = randn(neurons_num_x, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
-sigma_x = 18;
+sigma_x = 10;
 % first population range of values (+/-)
 x_pop_range = 100;
-% scaling factor for tuning curves
-bkg_firing = 10; % spk/s - background firing rate
-scaling_factor = 80; % motivated by the typical background and upper spiking rates
+% peak to peak spacing in tuning curves
+x_spacing = x_pop_range/((neurons_num_x-1)/2);
 % init population
-for i=1:neurons_num
+for i=1:neurons_num_x
     % evenly distributed preferred values in the interval
-    vi(i) = -x_pop_range+(i-1)*(x_pop_range/((neurons_num-1)/2));
+    vi(i) = -x_pop_range+(i-1)*(x_pop_range/((neurons_num_x-1)/2));
     % tuning curve of the neuron
     [pts, vals] = gauss_tuning(vi(i), ...
                                sigma_x, ...
@@ -58,20 +63,91 @@ for i=1:neurons_num
                             'ri', randi([bkg_firing , scaling_factor]));
 end;
 
-% plot the tunning curves of all neurons 
-figure(1);
-for i=1:neurons_num
+%% generate second population and initialize
+% preallocate
+vi=[];
+fi=[];
+ri=[];
+% zero mean noise
+etay = randn(neurons_num_y, 1)*noise_scale;
+% population standard deviation - coarse (big val) / sharp receptive field
+sigma_y = 17;
+% first population range of values (+/-)
+y_pop_range = 150;
+% peak to peak spacing in tuning curves
+y_spacing = y_pop_range/((neurons_num_y-1)/2);
+% init population
+for i=1:neurons_num_y
+    % evenly distributed preferred values in the interval
+    vi(i) = -y_pop_range+(i-1)*(y_pop_range/((neurons_num_y-1)/2));
+    % tuning curve of the neuron
+    [pts, vals] = gauss_tuning(vi(i), ...
+                               sigma_y, ...
+                               y_pop_range, ...
+                               scaling_factor);
+    fi(i).p = pts;
+    fi(i).v = vals;
+    y_population(i) = struct('i', i, ...
+                            'vi', vi(i),...
+                            'fi', fi(i), ...
+                            'etai', etay(i),...
+                            'ri', randi([bkg_firing , scaling_factor]));
+end;
+
+%% generate third population and initialize
+% preallocate
+vi=[];
+fi=[];
+ri=[];
+% zero mean noise
+etaz = randn(neurons_num_z, 1)*noise_scale;
+% population standard deviation - coarse (big val) / sharp receptive field
+sigma_z = 23;
+% first population range of values (+/-) 
+z_pop_range = 300;
+% peak to peak spacing in tuning curves
+z_spacing = z_pop_range/((neurons_num_z-1)/2);
+% init population
+for i=1:neurons_num_z
+    % evenly distributed preferred values in the interval
+    vi(i) = -z_pop_range+(i-1)*(z_pop_range/((neurons_num_z-1)/2));
+    % tuning curve of the neuron
+    [pts, vals] = gauss_tuning(vi(i), ...
+                               sigma_z, ...
+                               z_pop_range, ...
+                               scaling_factor);
+    fi(i).p = pts;
+    fi(i).v = vals;
+    z_population(i) = struct('i', i, ...
+                            'vi', vi(i),...
+                            'fi', fi(i), ...
+                            'etai', etaz(i),...
+                            'ri', randi([bkg_firing , scaling_factor]));
+end;
+
+%% NETWORK DYNAMICS 
+
+
+%% VISUALIZATION
+figure;
+%% first population 
+% plot the tunning curves of all neurons for the first population
+subplot(6, 3, 1);
+for i=1:neurons_num_x
     plot(x_population(i).fi.p, x_population(i).fi.v);
     hold all;
 end;
+title('Tuning curves of the neural population');
+ylabel('Activity (spk/s)');
+xlabel('Preferred value');
 
 % plot the encoded value in the population
-figure(2);
-encoded_val = -23;
+subplot(6, 3, 4);
+encoded_val_x = -23;
 % make the encoding of the value in the population and add noise
-for i=1:neurons_num
+for i=1:neurons_num_x
     % scale the firing rate to proper values and compute fi
-    x_population(i).ri = gauss_val(encoded_val, ...
+    x_population(i).ri = gauss_val(encoded_val_x, ...
                                    x_population(i).vi, ...
                                    sigma_x, ...
                                    scaling_factor) + ...
@@ -82,14 +158,90 @@ end;
 j = 1;
 for i=-x_pop_range:x_pop_range
     % display on even spacing of the entire input domain
-    if(rem(i,(abs(vi(1))-abs(vi(2))))==0)
+    if(rem(i, x_spacing)==0)
         plot(i, x_population(j).ri, 'o');
         hold all;
         j = j+1;
     end;
 end;
+grid on;       
+title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_x));
+ylabel('Activity (spk/s)');
+xlabel('Preferred value');
+
+%% second population 
+subplot(6, 3, 3);
+for i=1:neurons_num_y
+    plot(y_population(i).fi.p, y_population(i).fi.v);
+    hold all;
+end;
+title('Tuning curves of the neural population');
+ylabel('Activity (spk/s)');
+xlabel('Preferred value');
+
+% plot the encoded value in the population
+subplot(6, 3, 6);
+encoded_val_y = 18;
+% make the encoding of the value in the population and add noise
+for i=1:neurons_num_y
+    % scale the firing rate to proper values and compute fi
+    y_population(i).ri = gauss_val(encoded_val_y, ...
+                                   y_population(i).vi, ...
+                                   sigma_y, ...
+                                   scaling_factor) + ...
+                                   etay(i);
+end;
+% plot the noisy hill of population activity encoding the given value
+% index for neurons
+j = 1;
+for i=-y_pop_range:y_pop_range
+    % display on even spacing of the entire input domain
+    if(rem(i, y_spacing)==0)
+        plot(i, y_population(j).ri, 'o');
+        hold all;
+        j = j+1;
+    end;
+end;
+grid on;       
+title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_y));
+ylabel('Activity (spk/s)');
+xlabel('Preferred value');
 
 
+%% third population 
+subplot(6, 3, 14);
+for i=1:neurons_num_z
+    plot(z_population(i).fi.p, z_population(i).fi.v);
+    hold all;
+end;
+title('Tuning curves of the neural population');
+ylabel('Activity (spk/s)');
+xlabel('Preferred value');
 
-
-
+% plot the encoded value in the population
+subplot(6, 3, 17);
+encoded_val_z = 75;
+% make the encoding of the value in the population and add noise
+for i=1:neurons_num_z
+    % scale the firing rate to proper values and compute fi
+    z_population(i).ri = gauss_val(encoded_val_z, ...
+                                   z_population(i).vi, ...
+                                   sigma_z, ...
+                                   scaling_factor) + ...
+                                   etaz(i);
+end;
+% plot the noisy hill of population activity encoding the given value
+% index for neurons
+j = 1;
+for i=-z_pop_range:z_pop_range
+    % display on even spacing of the entire input domain
+    if(rem(i, z_spacing)==0)
+        plot(i, z_population(j).ri, 'o');
+        hold all;
+        j = j+1;
+    end;
+end;
+grid on;       
+title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_z));
+ylabel('Activity (spk/s)');
+xlabel('Preferred value');
