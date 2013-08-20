@@ -17,8 +17,8 @@ close all;
 
 % define the 1D populations (symmetric (size wise) populations)
 neurons_num_x = 41;  % number of neurons in the input populations
-neurons_num_y = 61;
-neurons_num_z = 51;
+neurons_num_y = 41;
+neurons_num_z = 41;
 noise_scale = 10;
 
 % neuron information (neuron index i)
@@ -41,7 +41,7 @@ ri=[];
 etax = randn(neurons_num_x, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
 sigma_x = 10;
-% first population range of values (+/-)
+% population range of values (+/-)
 x_pop_range = 100;
 % peak to peak spacing in tuning curves
 x_spacing = x_pop_range/((neurons_num_x-1)/2);
@@ -72,8 +72,8 @@ ri=[];
 etay = randn(neurons_num_y, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
 sigma_y = 17;
-% first population range of values (+/-)
-y_pop_range = 150;
+% population range of values (+/-)
+y_pop_range = 100;
 % peak to peak spacing in tuning curves
 y_spacing = y_pop_range/((neurons_num_y-1)/2);
 % init population
@@ -103,8 +103,8 @@ ri=[];
 etaz = randn(neurons_num_z, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
 sigma_z = 23;
-% first population range of values (+/-) 
-z_pop_range = 300;
+% population range of values (+/-) 
+z_pop_range = 200;
 % peak to peak spacing in tuning curves
 z_spacing = z_pop_range/((neurons_num_z-1)/2);
 % init population
@@ -126,7 +126,14 @@ for i=1:neurons_num_z
 end;
 
 %% NETWORK DYNAMICS 
-
+% define a 2D intermediate network layer on which the populations project
+% assuming we are projecting the populations x and y and population z will
+% encode an arbitrary function phi: z = phi(x, y)
+for i=1:neurons_num_x
+    for j=1:neurons_num_y
+        % connectivity matrix in the intermediate layer
+    end;
+end;
 
 %% VISUALIZATION
 figure;
