@@ -129,9 +129,38 @@ end;
 % define a 2D intermediate network layer on which the populations project
 % assuming we are projecting the populations x and y and population z will
 % encode an arbitrary function phi: z = phi(x, y)
+
+% connectivity matrix initialization
+omega_h = 1;
+omega_l = 0;
+for i=1:neurons_num_x
+    rx(i)=0.0;
+end
+for i=1:neurons_num_y
+    ry(i)=0.0;
+end
+J = omega_l + (omega_h - omega_l).*rand(neurons_num_x, neurons_num_y);
+% compute the individual inputs for each neuron in the intermediate layer
 for i=1:neurons_num_x
     for j=1:neurons_num_y
-        % connectivity matrix in the intermediate layer
+        for t = 1:neurons_num_x
+            rx(i) = rx(i) + J(i, t)*x_population(t).ri;
+        end
+        for z = 1:neurons_num_y
+            ry(j) = ry(j) + J(j, z)*y_population(z).ri;
+        end
+        rxy(i,j) = rx(i)+ry(j);
+    end
+end
+
+for i=1:neurons_num_x
+    for j=1:neurons_num_y
+        % build up the intermediate projection layer
+        % compute the activation for each neuron 
+        rij(i,j) = sigmoid(rxy(i,j));
+        projection_layer(i,j) = struct('i', i, ...
+                                       'j', j, ...
+                                       'rij', rij(i,j));
     end;
 end;
 
