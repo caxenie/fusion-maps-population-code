@@ -152,12 +152,18 @@ for i=1:neurons_num_x
         rxy(i,j) = rx(i)+ry(j);
     end
 end
+% initial random activity pattern in the intermediate layer
+for i=1:neurons_num_x
+    for j = 1:neurons_num_y
+        rxy0(i,j) = x_population(i).vi + y_population(j).vi;
+    end
+end
 
 for i=1:neurons_num_x
     for j=1:neurons_num_y
         % build up the intermediate projection layer
         % compute the activation for each neuron 
-        rij(i,j) = sigmoid(rxy(i,j));
+        rij(i,j) = sigmoid(80, rxy0(i,j), rxy(i,j));
         projection_layer(i,j) = struct('i', i, ...
                                        'j', j, ...
                                        'rij', rij(i,j));
@@ -281,3 +287,12 @@ grid on;
 title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_z));
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
+
+%% intermediate layer activity
+subplot(6,3,[8 11]);
+for i=1:neurons_num_x
+    for j=1:neurons_num_y
+        projected_activity(i,j) = projection_layer(i,j).rij;
+    end
+end
+mesh(1:neurons_num_x, 1:neurons_num_y, projected_activity);
