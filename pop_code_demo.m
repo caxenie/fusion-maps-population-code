@@ -60,7 +60,7 @@ for i=1:neurons_num_x
                             'vi', vi(i),...
                             'fi', fi(i), ...
                             'etai', etax(i),...
-                            'ri', randi([bkg_firing , scaling_factor]));
+                            'ri', abs(randi([bkg_firing , scaling_factor])));
 end;
 
 %% generate second population and initialize
@@ -91,7 +91,7 @@ for i=1:neurons_num_y
                             'vi', vi(i),...
                             'fi', fi(i), ...
                             'etai', etay(i),...
-                            'ri', randi([bkg_firing , scaling_factor]));
+                            'ri', abs(randi([bkg_firing , scaling_factor])));
 end;
 
 %% generate third population and initialize
@@ -139,23 +139,41 @@ end
 for i=1:neurons_num_y
     ry(i)=0.0;
 end
+% connectivity matrix
 J = omega_l + (omega_h - omega_l).*rand(neurons_num_x, neurons_num_y);
-% compute the individual inputs for each neuron in the intermediate layer
+% sharp peak - max - of J at i=j
 for i=1:neurons_num_x
     for j=1:neurons_num_y
-        for t = 1:neurons_num_x
-            rx(i) = rx(i) + J(i, t)*x_population(t).ri;
+        if(i==j)
+            J(i, j) = omega_h;                                                                                                                               
         end
-        for z = 1:neurons_num_y
-            ry(j) = ry(j) + J(j, z)*y_population(z).ri;
-        end
-        rxy(i,j) = rx(i)+ry(j);
     end
 end
+
+% compute the individual inputs for each neuron in the intermediate layer
+for i=1:neurons_num_x
+        for k = 1:neurons_num_x
+            rx(i) = rx(i) + J(i, k)*x_population(k).ri;
+        end
+end
+
+
+for j=1:neurons_num_y
+        for l = 1:neurons_num_y
+            ry(j) = ry(j) + J(j, l)*y_population(l).ri;
+        end
+end
+
+for i=1:neurons_num_x
+    for j=1:neurons_num_y
+        rxy(i, j) = rx(i) + ry(j);
+    end
+end
+
 % initial random activity pattern in the intermediate layer
 for i=1:neurons_num_x
     for j = 1:neurons_num_y
-        rxy0(i,j) = x_population(i).vi + y_population(j).vi;
+           rxy0(i,j) = x_population(i).vi + y_population(j).vi;
     end
 end
 
@@ -163,7 +181,7 @@ for i=1:neurons_num_x
     for j=1:neurons_num_y
         % build up the intermediate projection layer
         % compute the activation for each neuron 
-        rij(i,j) = sigmoid(80, rxy0(i,j), rxy(i,j));
+        rij(i,j) = sigmoid(bkg_firing, rxy0(i,j), rxy(i,j));
         projection_layer(i,j) = struct('i', i, ...
                                        'j', j, ...
                                        'rij', rij(i,j));
@@ -187,6 +205,14 @@ xlabel('Preferred value');
 subplot(6, 3, 4);
 encoded_val_x = -23;
 % make the encoding of the value in the population and add noise
+% record data on multiple trials
+num_trials = 100;
+for trial=1:num_trials
+    % noise on every trial to get trial-to-trial variability
+    % zero mean noise 
+    etax = randn(neurons_num_x, 1)*noise_scale;
+    etay = randn(neurons_num_y, 1)*noise_scale;
+    etaz = randn(neurons_num_z, 1)*noise_scale;
 for i=1:neurons_num_x
     % scale the firing rate to proper values and compute fi
     x_population(i).ri = gauss_val(encoded_val_x, ...
@@ -206,6 +232,7 @@ for i=-x_pop_range:x_pop_range
         j = j+1;
     end;
 end;
+end
 grid on;       
 title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_x));
 ylabel('Activity (spk/s)');
