@@ -4,11 +4,4 @@
 % u0 = switch point (changes polarity)
 function psi = sigmoid(v0, u0, u)
      psi = v0*(1/(1 + exp(u0-u)));
-%     % test sigmoid
-%     x=1:100;
-%     for i=1:length(x)
-%         psi(i)=v0*(1/(1+exp(u0-x(i))));
-%         plot(x(i), psi(i), 'o');
-%         hold all;
-%     end
 end

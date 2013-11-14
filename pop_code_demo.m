@@ -19,18 +19,19 @@ close all;
 neurons_num_x = 41;  % number of neurons in the input populations
 neurons_num_y = 41;
 neurons_num_z = 41;
-noise_scale = 10;
+noise_scale = 5;
 
 % neuron information (neuron index i)
 %   i       - index in the population 
 %   ri      - activity of the neuron (firing rate)
 %   fi      - tuning curve (e.g. Gaussian)
 %   vi      - preferred value - even distribution in the range
-%   etai    - noise value - zero mean and correlated
+%   etai    - noise value - zero mean and tipically correlated
 
 % scaling factor for tuning curves
 bkg_firing = 10; % spk/s - background firing rate
 scaling_factor = 80; % motivated by the typical background and upper spiking rates
+max_firing = 100;
 
 %% generate first population and initialize
 % preallocate
@@ -39,7 +40,7 @@ fi=[];
 ri=[];
 % zero mean noise 
 etax = randn(neurons_num_x, 1)*noise_scale;
-% population standard deviation - coarse (big val) / sharp receptive field
+% population standard deviation -> coarse (big val) / sharp (small val) receptive field
 sigma_x = 10;
 % population range of values (+/-)
 x_pop_range = 100;
@@ -60,7 +61,7 @@ for i=1:neurons_num_x
                             'vi', vi(i),...
                             'fi', fi(i), ...
                             'etai', etax(i),...
-                            'ri', abs(randi([bkg_firing , scaling_factor])));
+                            'ri', abs(randi([bkg_firing , max_firing])));
 end;
 
 %% generate second population and initialize
@@ -133,60 +134,44 @@ end;
 % connectivity matrix initialization
 omega_h = 1;
 omega_l = 0;
-for i=1:neurons_num_x
-    rx(i)=0.0;
-end
-for i=1:neurons_num_y
-    ry(i)=0.0;
-end
+sigma_rx = 0.0;
+sigma_ry = 0.0;
 % connectivity matrix
 J = omega_l + (omega_h - omega_l).*rand(neurons_num_x, neurons_num_y);
 % sharp peak - max - of J at i=j
 for i=1:neurons_num_x
     for j=1:neurons_num_y
         if(i==j)
-            J(i, j) = omega_h;                                                                                                                               
+            J(i,j) = omega_h;                                                                                                                               
         end
     end
 end
 
-% compute the individual inputs for each neuron in the intermediate layer
+% compute the total input for each neuron in the intermediate layers
 for i=1:neurons_num_x
+    for j=1:neurons_num_y
+        % reinit sum for every neuron in the intermediate layer
+        sigma_rx = 0.0;
+        sigma_ry = 0.0;
+        % initial null activity pattern in the intermediate layer
+        rxy0 = 0.0;
+        % each input population contribution 
         for k = 1:neurons_num_x
-            rx(i) = rx(i) + J(i, k)*x_population(k).ri;
+            sigma_rx = sigma_rx + J(i,k)*x_population(k).ri;
         end
-end
-
-
-for j=1:neurons_num_y
         for l = 1:neurons_num_y
-            ry(j) = ry(j) + J(j, l)*y_population(l).ri;
+            sigma_ry = sigma_ry + J(j,l)*y_population(l).ri;
         end
-end
-
-for i=1:neurons_num_x
-    for j=1:neurons_num_y
-        rxy(i, j) = rx(i) + ry(j);
-    end
-end
-
-% initial random activity pattern in the intermediate layer
-for i=1:neurons_num_x
-    for j = 1:neurons_num_y
-           rxy0(i,j) = x_population(i).vi + y_population(j).vi;
-    end
-end
-
-for i=1:neurons_num_x
-    for j=1:neurons_num_y
+        % superimpose contributions from both populations 
+        rxy = sigma_rx + sigma_ry;
         % build up the intermediate projection layer
         % compute the activation for each neuron 
-        rij(i,j) = sigmoid(bkg_firing, rxy0(i,j), rxy(i,j));
+        rij(i,j) = sigmoid(max_firing, rxy0, rxy/1000);
         projection_layer(i,j) = struct('i', i, ...
                                        'j', j, ...
                                        'rij', rij(i,j));
-    end;
-end;
+    end
+end
 
 %% VISUALIZATION
 figure;
@@ -203,11 +188,11 @@ xlabel('Preferred value');
 
 % plot the encoded value in the population
 subplot(6, 3, 4);
-encoded_val_x = -23;
+encoded_val_x = -55;
 % make the encoding of the value in the population and add noise
-% record data on multiple trials
-num_trials = 100;
-for trial=1:num_trials
+% % record data on multiple trials
+% num_trials = 100;
+% for trial=1:num_trials
     % noise on every trial to get trial-to-trial variability
     % zero mean noise 
     etax = randn(neurons_num_x, 1)*noise_scale;
@@ -232,7 +217,7 @@ for i=-x_pop_range:x_pop_range
         j = j+1;
     end;
 end;
-end
+% end
 grid on;       
 title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_x));
 ylabel('Activity (spk/s)');
@@ -250,7 +235,7 @@ xlabel('Preferred value');
 
 % plot the encoded value in the population
 subplot(6, 3, 6);
-encoded_val_y = 18;
+encoded_val_y = 45;
 % make the encoding of the value in the population and add noise
 for i=1:neurons_num_y
     % scale the firing rate to proper values and compute fi
@@ -289,7 +274,7 @@ xlabel('Preferred value');
 
 % plot the encoded value in the population
 subplot(6, 3, 17);
-encoded_val_z = 75;
+encoded_val_z = 34;
 % make the encoding of the value in the population and add noise
 for i=1:neurons_num_z
     % scale the firing rate to proper values and compute fi
