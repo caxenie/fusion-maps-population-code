@@ -72,7 +72,7 @@ ri=[];
 % zero mean noise
 etay = randn(neurons_num_y, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
-sigma_y = 17;
+sigma_y = 10;
 % population range of values (+/-)
 y_pop_range = 100;
 % peak to peak spacing in tuning curves
@@ -103,7 +103,7 @@ ri=[];
 % zero mean noise
 etaz = randn(neurons_num_z, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
-sigma_z = 23;
+sigma_z = 10;
 % population range of values (+/-) 
 z_pop_range = 200;
 % peak to peak spacing in tuning curves
@@ -125,54 +125,6 @@ for i=1:neurons_num_z
                             'etai', etaz(i),...
                             'ri', randi([bkg_firing , scaling_factor]));
 end;
-
-%% NETWORK DYNAMICS 
-% define a 2D intermediate network layer on which the populations project
-% assuming we are projecting the populations x and y and population z will
-% encode an arbitrary function phi: z = phi(x, y)
-
-% connectivity matrix initialization
-omega_h = 1;
-omega_l = 0;
-sigma_rx = 0.0;
-sigma_ry = 0.0;
-% connectivity matrix
-J = omega_l + (omega_h - omega_l).*rand(neurons_num_x, neurons_num_y);
-% sharp peak - max - of J at i=j
-for i=1:neurons_num_x
-    for j=1:neurons_num_y
-        if(i==j)
-            J(i,j) = omega_h;                                                                                                                               
-        end
-    end
-end
-
-% compute the total input for each neuron in the intermediate layers
-for i=1:neurons_num_x
-    for j=1:neurons_num_y
-        % reinit sum for every neuron in the intermediate layer
-        sigma_rx = 0.0;
-        sigma_ry = 0.0;
-        % initial null activity pattern in the intermediate layer
-        rxy0 = 0.0;
-        % each input population contribution 
-        for k = 1:neurons_num_x
-            sigma_rx = sigma_rx + J(i,k)*x_population(k).ri;
-        end
-        for l = 1:neurons_num_y
-            sigma_ry = sigma_ry + J(j,l)*y_population(l).ri;
-        end
-        % superimpose contributions from both populations 
-        rxy = sigma_rx + sigma_ry;
-        % build up the intermediate projection layer
-        % compute the activation for each neuron 
-        rij(i,j) = sigmoid(max_firing, rxy0, rxy/1000);
-        projection_layer(i,j) = struct('i', i, ...
-                                       'j', j, ...
-                                       'rij', rij(i,j));
-    end
-end
-
 %% VISUALIZATION
 figure;
 %% first population 
@@ -205,6 +157,9 @@ for i=1:neurons_num_x
                                    sigma_x, ...
                                    scaling_factor) + ...
                                    etax(i);
+    % rate should be positive althought noise can make small vallues
+    % negative
+    x_population(i).ri = abs(x_population(i).ri);
 end;
 % plot the noisy hill of population activity encoding the given value
 % index for neurons
@@ -244,6 +199,9 @@ for i=1:neurons_num_y
                                    sigma_y, ...
                                    scaling_factor) + ...
                                    etay(i);
+    % rate should be positive althought noise can make small vallues
+    % negative
+    y_population(i).ri = abs(y_population(i).ri);                               
 end;
 % plot the noisy hill of population activity encoding the given value
 % index for neurons
@@ -260,7 +218,6 @@ grid on;
 title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_y));
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
-
 
 %% third population 
 subplot(6, 3, 14);
@@ -283,6 +240,9 @@ for i=1:neurons_num_z
                                    sigma_z, ...
                                    scaling_factor) + ...
                                    etaz(i);
+    % rate should be positive althought noise can make small vallues
+    % negative
+    z_population(i).ri = abs(z_population(i).ri);                               
 end;
 % plot the noisy hill of population activity encoding the given value
 % index for neurons
@@ -299,6 +259,54 @@ grid on;
 title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_z));
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
+
+%% NETWORK DYNAMICS 
+% define a 2D intermediate network layer on which the populations project
+% assuming we are projecting the populations x and y and population z will
+% encode an arbitrary function phi: z = phi(x, y)
+
+% connectivity matrix initialization
+omega_h = 1;
+omega_l = 0;
+sigma_rx = 0.0;
+sigma_ry = 0.0;
+% connectivity matrix random initialization
+J = omega_l + (omega_h - omega_l).*rand(neurons_num_x, neurons_num_y);
+% sharp peak of J at i=j
+for i=1:neurons_num_x
+    for j=1:neurons_num_y
+        if(i==j)
+            J(i,j) = omega_h;                                                                                                                               
+        end
+    end
+end
+
+% compute the total input for each neuron in the intermediate layers
+for i=1:neurons_num_x
+    for j=1:neurons_num_y
+        % reinit sum for every neuron in the intermediate layer
+        sigma_rx = 0.0;
+        sigma_ry = 0.0;
+        % initial null activity pattern in the intermediate layer
+        rxy0 = 0.0;
+        % each input population contribution 
+        for k = 1:neurons_num_x
+            sigma_rx = sigma_rx + J(i,k)*x_population(k).ri;
+        end
+        for l = 1:neurons_num_y
+            sigma_ry = sigma_ry + J(j,l)*y_population(l).ri;
+        end
+        % superimpose contributions from both populations 
+        rxy = sigma_rx + sigma_ry;
+        % build up the intermediate projection layer
+        % compute the activation for each neuron 
+        %% TODO check if normalization of sum-rates is needed !
+        rij(i,j) = sigmoid(max_firing, rxy0, rxy);
+        projection_layer(i,j) = struct('i', i, ...
+                                       'j', j, ...
+                                       'rij', rij(i,j));
+    end
+end
 
 %% intermediate layer activity
 subplot(6,3,[8 11]);
