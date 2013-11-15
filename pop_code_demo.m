@@ -12,16 +12,19 @@
 
 %% INITIALIZATION
 clear all;
-clc; 
+clc; close all;
 
 % define the 1D populations (symmetric (size wise) populations)
-neurons_pop_x = 40;
-neurons_pop_y = 40;
-neurons_pop_z = 40;
+neurons_pop_x = 50;
+neurons_pop_y = 50;
+neurons_pop_z = 50;
 neurons_complete_x = neurons_pop_x + 1;  % number of neurons in the input populations
 neurons_complete_y = neurons_pop_y + 1;
 neurons_complete_z = neurons_pop_z + 1;
-noise_scale = 5;
+noise_scale = 7;
+
+%% HACK polarity change in sigmoid activation function
+sigmoid_polarity_switch = 1.1765;
 
 % neuron information (neuron index i)
 %   i       - index in the population 
@@ -36,15 +39,14 @@ scaling_factor = 80; % motivated by the typical background and upper spiking rat
 max_firing = 100;
 
 % demo params 
-encoded_val_x = 60;
-encoded_val_y = -35;
-encoded_val_z = 25;
+encoded_val_x = -45;
+encoded_val_y = 20;
+encoded_val_z = 54;
 
 %% generate first population and initialize
 % preallocate
-vi=[];
-fi=[];
-ri=[];
+vix=zeros(1, neurons_complete_x);
+
 % zero mean noise 
 etax = randn(neurons_complete_x, 1)*noise_scale;
 % population standard deviation -> coarse (big val) / sharp (small val) receptive field
@@ -53,29 +55,29 @@ sigma_x = 10;
 x_pop_range = 100;
 % peak to peak spacing in tuning curves
 x_spacing = x_pop_range/((neurons_complete_x-1)/2);
+
 % init population
 for i=1:neurons_complete_x
     % evenly distributed preferred values in the interval
-    vi(i) = -x_pop_range+(i-1)*(x_pop_range/((neurons_complete_x-1)/2));
+    vix(i) = -x_pop_range+(i-1)*(x_pop_range/((neurons_complete_x-1)/2));
     % tuning curve of the neuron
-    [pts, vals] = gauss_tuning(vi(i), ...
+    [pts, vals] = gauss_tuning(vix(i), ...
                                sigma_x, ...
                                x_pop_range, ...
                                scaling_factor);
-    fi(i).p = pts;
-    fi(i).v = vals;
-    x_population(i) = struct('i', i, ...
-                            'vi', vi(i),...
-                            'fi', fi(i), ...
+    fix(i).p = pts;
+    fix(i).v = vals;
+    x_population(i) = struct('i',   i, ...
+                            'vi',   vix(i),...
+                            'fi',   fix(i), ...
                             'etai', etax(i),...
-                            'ri', abs(randi([bkg_firing , max_firing])));
+                            'ri',   abs(randi([bkg_firing , max_firing])));
 end;
 
 %% generate second population and initialize
 % preallocate
-vi=[];
-fi=[];
-ri=[];
+viy=zeros(1, neurons_complete_y);
+ 
 % zero mean noise
 etay = randn(neurons_complete_y, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
@@ -87,26 +89,25 @@ y_spacing = y_pop_range/((neurons_complete_y-1)/2);
 % init population
 for i=1:neurons_complete_y
     % evenly distributed preferred values in the interval
-    vi(i) = -y_pop_range+(i-1)*(y_pop_range/((neurons_complete_y-1)/2));
+    viy(i) = -y_pop_range+(i-1)*(y_pop_range/((neurons_complete_y-1)/2));
     % tuning curve of the neuron
-    [pts, vals] = gauss_tuning(vi(i), ...
+    [pts, vals] = gauss_tuning(viy(i), ...
                                sigma_y, ...
                                y_pop_range, ...
                                scaling_factor);
-    fi(i).p = pts;
-    fi(i).v = vals;
-    y_population(i) = struct('i', i, ...
-                            'vi', vi(i),...
-                            'fi', fi(i), ...
+    fiy(i).p = pts;
+    fiy(i).v = vals;
+    y_population(i) = struct('i',   i, ...
+                            'vi',   viy(i),...
+                            'fi',   fiy(i), ...
                             'etai', etay(i),...
-                            'ri', abs(randi([bkg_firing , scaling_factor])));
+                            'ri',   abs(randi([bkg_firing , max_firing])));
 end;
 
 %% generate third population and initialize
 % preallocate
-vi=[];
-fi=[];
-ri=[];
+viz=zeros(1, neurons_complete_z);
+ 
 % zero mean noise
 etaz = randn(neurons_complete_z, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
@@ -118,29 +119,33 @@ z_spacing = z_pop_range/((neurons_complete_z-1)/2);
 % init population
 for i=1:neurons_complete_z
     % evenly distributed preferred values in the interval
-    vi(i) = -z_pop_range+(i-1)*(z_pop_range/((neurons_complete_z-1)/2));
+    viz(i) = -z_pop_range+(i-1)*(z_pop_range/((neurons_complete_z-1)/2));
     % tuning curve of the neuron
-    [pts, vals] = gauss_tuning(vi(i), ...
+    [pts, vals] = gauss_tuning(viz(i), ...
                                sigma_z, ...
                                z_pop_range, ...
                                scaling_factor);
-    fi(i).p = pts;
-    fi(i).v = vals;
-    z_population(i) = struct('i', i, ...
-                            'vi', vi(i),...
-                            'fi', fi(i), ...
+    fiz(i).p = pts;
+    fiz(i).v = vals;
+    z_population(i) = struct('i',   i, ...
+                            'vi',   viz(i),...
+                            'fi',   fiz(i), ...
                             'etai', etaz(i),...
-                            'ri', randi([bkg_firing , scaling_factor]));
+                            'ri',   randi([bkg_firing , max_firing]));
 end;
 %% VISUALIZATION
 figure;
-%% first population 
+set(gcf,'color','w');
+
+% first population 
 % plot the tunning curves of all neurons for the first population
 subplot(6, 3, 1);
 for i=1:neurons_complete_x
     plot(x_population(i).fi.p, x_population(i).fi.v);
     hold all;
 end;
+grid off;
+set(gca, 'Box', 'off');
 title('Tuning curves of the neural population');
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
@@ -148,14 +153,12 @@ xlabel('Preferred value');
 % plot the encoded value in the population
 subplot(6, 3, 4);
 % make the encoding of the value in the population and add noise
-% % record data on multiple trials
-% num_trials = 100;
-% for trial=1:num_trials
-    % noise on every trial to get trial-to-trial variability
-    % zero mean noise 
-    etax = randn(neurons_complete_x, 1)*noise_scale;
-    etay = randn(neurons_complete_y, 1)*noise_scale;
-    etaz = randn(neurons_complete_z, 1)*noise_scale;
+% noise on every trial to get trial-to-trial variability
+% zero mean noise
+etax = randn(neurons_complete_x, 1)*noise_scale;
+etay = randn(neurons_complete_y, 1)*noise_scale;
+etaz = randn(neurons_complete_z, 1)*noise_scale;
+
 for i=1:neurons_complete_x
     % scale the firing rate to proper values and compute fi
     x_population(i).ri = gauss_val(encoded_val_x, ...
@@ -177,19 +180,21 @@ for i=-x_pop_range:x_pop_range
         hold all;
         j = j+1;
     end;
-end;
-% end
-grid on;       
+end; 
+grid off;
+set(gca, 'Box', 'off');
 title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_x));
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
 
-%% second population 
+% second population 
 subplot(6, 3, 3);
 for i=1:neurons_complete_y
     plot(y_population(i).fi.p, y_population(i).fi.v);
     hold all;
 end;
+grid off;
+set(gca, 'Box', 'off');
 title('Tuning curves of the neural population');
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
@@ -219,17 +224,20 @@ for i=-y_pop_range:y_pop_range
         j = j+1;
     end;
 end;
-grid on;       
+grid off;
+set(gca, 'Box', 'off');      
 title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_y));
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
 
-%% third population 
+% third population 
 subplot(6, 3, 14);
 for i=1:neurons_complete_z
     plot(z_population(i).fi.p, z_population(i).fi.v);
     hold all;
 end;
+grid off;
+set(gca, 'Box', 'off');
 title('Tuning curves of the neural population');
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
@@ -259,7 +267,8 @@ for i=-z_pop_range:z_pop_range
         j = j+1;
     end;
 end;
-grid on;       
+grid off;
+set(gca, 'Box', 'off');     
 title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_z));
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
@@ -287,24 +296,12 @@ end
 
 % stores the summed input activity for each neuron before intermediate
 % layer
-sigma_hist_rx = [];
-sigma_hist_ry = [];
+sigma_hist_rx = zeros(1, neurons_complete_x);
+sigma_hist_ry = zeros(1, neurons_complete_y);
 
-for i = 1:neurons_complete_x
-    for j = 1:neurons_complete_y
-        sigma_hist_rx(i,j) = 0;
-        sigma_hist_ry(i,j) = 0;
-    end
-end
 % stores the activity of each neuron in the intermediate layer as a
 % superposition of the activities in the input layers
-rxy_hist = [];
-
-for i = 1:neurons_complete_x
-    for j = 1:neurons_complete_y
-        rxy_hist(i,j) = 0;
-    end
-end
+rxy_hist = zeros(neurons_complete_x, neurons_complete_y);
 
 % compute the total input for each neuron in the intermediate layers
 for i=1:neurons_complete_x
@@ -339,12 +336,9 @@ for i=1:neurons_complete_x
 end
 
 % normalized activity vector for neurons in the intermediate layer
-rxy_normed = [];
-for i = 1:neurons_complete_x
-    for j = 1:neurons_complete_y
-        rxy_normed(i, j) = 0;
-    end
-end
+rxy_normed = zeros(neurons_complete_x, neurons_complete_y);
+% final activity of a neuron in the intermediate layer 
+rij = zeros(neurons_complete_x, neurons_complete_y);
 
 % assemble the intermediate layer and fill in with activity values
 for i  = 1:neurons_complete_x
@@ -357,7 +351,9 @@ for i  = 1:neurons_complete_x
             (max(rxy_hist(:) - min(rxy_hist(:))));
         % build up the intermediate projection layer
         % compute the activation for each neuron 
-        rij(i,j) = sigmoid(max_firing, max_firing/2, rxy_normed(i,j));
+        rij(i,j) = sigmoid(max_firing, ...
+                           max_firing/sigmoid_polarity_switch, ...
+                           rxy_normed(i,j));
         projection_layer(i,j) = struct('i', i, ...
                                        'j', j, ...
                                        'rij', rij(i,j));
@@ -365,8 +361,15 @@ for i  = 1:neurons_complete_x
     end
 end
 
+% get rid of the ridges in the activity profile of the intermediate layer
+% and keep only the bump of activity -> DoG connectivity (Mexican Hat)
+% which brings short range excitation and long range inhibition
 
-%% intermediate layer activity
+%% VISUALIZATION
+%intermediate layer activity
+% intialize the projected activity on the intermediate layer in aux var
+% just for visualization 
+projected_activity = zeros(neurons_complete_x, neurons_complete_y);
 subplot(6,3,[8 11]);
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
@@ -374,3 +377,5 @@ for i=1:neurons_complete_x
     end
 end
 mesh(1:neurons_complete_x, 1:neurons_complete_y, projected_activity);
+grid off;
+set(gca, 'Box', 'off');  
