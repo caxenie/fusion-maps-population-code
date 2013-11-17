@@ -395,38 +395,44 @@ set(gca, 'Box', 'off');
 
 % parameters that control the shape of the W connectivity matrix in the
 % intermediate layer 
-We      = 1.6; % short range excitation strength We > Wi
-Wi      = 0.6; % long range inhibition strength 
-sigma_e = 5;  % excitation Gaussian profile sigma_e < sigma_i
-sigma_i = 10;  % inhibiton Gaussian profile
+We      = 1.5; % short range excitation strength We > Wi
+Wi      = 0.5; % long range inhibition strength 
+sigma_e = 10;  % excitation Gaussian profile sigma_e < sigma_i
+sigma_i = 20;  % inhibiton Gaussian profile
 W = zeros(neurons_complete_x, neurons_complete_y);
 
 % build the recurrent connectivity matrix
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
-        for k = 1:neurons_complete_x
-            for l = 1:neurons_complete_y
+        for k = 1:neurons_complete_x-i
+            for l = 1:neurons_complete_y-j
                 W(i,j) = We*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_e^2))) - ...
-                      Wi*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_i^2)));
+                         Wi*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_i^2)));
             end
         end
     end
 end
-
-% stores the summed input activity for recurrent connecitons in intermed.
+% stores the summed input activity for recurrent connections in intermed.
 % layer
 sum_hist_recurrent = zeros(neurons_complete_x, neurons_complete_y);
+% stores the (un-normalized) activity of a neuron in the intermed. layer
+interm_activities = zeros(neurons_complete_x, neurons_complete_y);
+% history of activity values while relaxing into a stable state
+rxy_hist_old = 0;
 
-% build up the recurrent conenctivity matrix in the intermediate layer
+% build up the recurrent conectivity matrix in the intermediate layer so
+% that the ridges are eliminated from the intermediate layer and only the
+% bump persists
+
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
         % reinit sum for every neuron in the intermediate layer
         sum_rx = 0.0;
         sum_ry = 0.0;
-        % recurrent connection contribution 
+        % recurrent connection contribution
         sum_recurrent = 0.0;
         
-        % each input population contribution 
+        % each input population contribution
         for k = 1:neurons_complete_x
             sum_rx = sum_rx + J(i,k)*x_population(k).ri;
         end
@@ -434,8 +440,15 @@ for i=1:neurons_complete_x
             sum_ry = sum_ry + J(j,l)*y_population(l).ri;
         end
         
-        % recurrent connectivity contribution 
+        % fill in the global activity matrix
+        interm_activities(i,j) = sum_rx + sum_ry;
         
+        % recurrent connectivity contribution
+        for k = 1:neurons_complete_x
+            for l = 1:neurons_complete_y 
+                sum_recurrent = sum_recurrent + W(i,j)*interm_activities(k,l);
+            end
+        end
         
         % update history of activities
         sum_hist_rx(i,j) = sum_rx;
@@ -447,13 +460,8 @@ for i=1:neurons_complete_x
         
         % update history for the intermediate layer neurons
         rxy_hist(i,j) = rxy;
-    end
-end
-
-% assemble the intermediate layer and fill in with activity values
-for i  = 1:neurons_complete_x
-    for j = 1:neurons_complete_y
-        % normalize the total activity such that we have consistent 
+        
+        % normalize the total activity such that we have consistent
         % rate in the intermediate layer bound to [bkg_firing, max_firing]
         rxy_normed(i,j) = bkg_firing + ...
             ((rxy_hist(i,j) - min(rxy_hist(:)))*...
@@ -461,7 +469,7 @@ for i  = 1:neurons_complete_x
             (max(rxy_hist(:) - min(rxy_hist(:))));
         switch(activation_type)
             case 'sigmoid'
-                % compute the activation for each neuron - sigmoid activation 
+                % compute the activation for each neuron - sigmoid activation
                 rij(i,j) = sigmoid(max_firing, ...
                                    max_firing/sigmoid_polarity_switch, ...
                                    rxy_normed(i,j));
@@ -477,11 +485,15 @@ for i  = 1:neurons_complete_x
 end
 
 %% FEEDFORWARD CONNECTIVITY FROM INTERMEDIATE LAYER TO OUTPUT POPULATION
+% after relaxation the intermediate layer activity is projected onto the
+% output population
+
 
 
 %% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY (AFTER DYNAMICS)
 % intermediate layer activity after net dynamics relaxed
 projected_activity = zeros(neurons_complete_x, neurons_complete_y);
+
 subplot(6, 4, [11 15]);
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
