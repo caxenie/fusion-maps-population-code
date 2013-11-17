@@ -139,7 +139,7 @@ set(gcf,'color','w');
 
 % first population 
 % plot the tunning curves of all neurons for the first population
-subplot(6, 3, 1);
+subplot(6, 4, [1 2]);
 for i=1:neurons_complete_x
     plot(x_population(i).fi.p, x_population(i).fi.v);
     hold all;
@@ -148,10 +148,9 @@ grid off;
 set(gca, 'Box', 'off');
 title('Tuning curves of the neural population');
 ylabel('Activity (spk/s)');
-xlabel('Preferred value');
 
 % plot the encoded value in the population
-subplot(6, 3, 4);
+subplot(6, 4, [5 6]);
 % make the encoding of the value in the population and add noise
 % noise on every trial to get trial-to-trial variability
 % zero mean noise
@@ -188,7 +187,7 @@ ylabel('Activity (spk/s)');
 xlabel('Preferred value');
 
 % second population 
-subplot(6, 3, 3);
+subplot(6, 4, [3 4]);
 for i=1:neurons_complete_y
     plot(y_population(i).fi.p, y_population(i).fi.v);
     hold all;
@@ -197,10 +196,9 @@ grid off;
 set(gca, 'Box', 'off');
 title('Tuning curves of the neural population');
 ylabel('Activity (spk/s)');
-xlabel('Preferred value');
 
 % plot the encoded value in the population
-subplot(6, 3, 6);
+subplot(6, 4, [7 8]);
 % make the encoding of the value in the population and add noise
 for i=1:neurons_complete_y
     % scale the firing rate to proper values and compute fi
@@ -231,7 +229,7 @@ ylabel('Activity (spk/s)');
 xlabel('Preferred value');
 
 % third population 
-subplot(6, 3, 14);
+subplot(6, 4, [18 19]);
 for i=1:neurons_complete_z
     plot(z_population(i).fi.p, z_population(i).fi.v);
     hold all;
@@ -240,10 +238,9 @@ grid off;
 set(gca, 'Box', 'off');
 title('Tuning curves of the neural population');
 ylabel('Activity (spk/s)');
-xlabel('Preferred value');
 
 % plot the encoded value in the population
-subplot(6, 3, 17);
+subplot(6, 4, [22 23]);
 % make the encoding of the value in the population and add noise
 for i=1:neurons_complete_z
     % scale the firing rate to proper values and compute fi
@@ -282,8 +279,8 @@ xlabel('Preferred value');
 % connectivity matrix initialization
 omega_h = 1;
 omega_l = 0;
-sigma_rx = 0.0;
-sigma_ry = 0.0;
+sum_rx = 0.0;
+sum_ry = 0.0;
 
 % connectivity matrix random initialization
 J =  omega_l + ((omega_h - omega_l)/100).*rand(neurons_complete_x, neurons_complete_y);
@@ -310,8 +307,8 @@ for i=1:neurons_complete_x
     
 % stores the summed input activity for each neuron before intermediate
 % layer
-sigma_hist_rx = zeros(1, neurons_complete_x);
-sigma_hist_ry = zeros(1, neurons_complete_y);
+sum_hist_rx = zeros(1, neurons_complete_x);
+sum_hist_ry = zeros(1, neurons_complete_y);
 
 % stores the activity of each neuron in the intermediate layer as a
 % superposition of the activities in the input layers
@@ -321,22 +318,21 @@ rxy_hist = zeros(neurons_complete_x, neurons_complete_y);
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
         % reinit sum for every neuron in the intermediate layer
-        sigma_rx = 0.0;
-        sigma_ry = 0.0;
-        % initial null activity pattern in the intermediate layer
-        rxy0 = 0.0;
+        sum_rx = 0.0;
+        sum_ry = 0.0;
+
         % each input population contribution 
         for k = 1:neurons_complete_x
-            sigma_rx = sigma_rx + J(i,k)*x_population(k).ri;
+            sum_rx = sum_rx + J(i,k)*x_population(k).ri;
         end
         for l = 1:neurons_complete_y
-            sigma_ry = sigma_ry + J(j,l)*y_population(l).ri;
+            sum_ry = sum_ry + J(j,l)*y_population(l).ri;
         end
         % update history of activities
-        sigma_hist_rx(i,j) = sigma_rx;
-        sigma_hist_ry(i,j) = sigma_ry;
+        sum_hist_rx(i,j) = sum_rx;
+        sum_hist_ry(i,j) = sum_ry;
         % superimpose contributions from both populations 
-        rxy = sigma_rx + sigma_ry;
+        rxy = sum_rx + sum_ry;
         % update history for the intermediate layer neurons
         rxy_hist(i,j) = rxy;
     end
@@ -377,24 +373,116 @@ for i  = 1:neurons_complete_x
                                        'rij', rij(i,j));
     end
 end
-%% RECURRENT CONNECTIVITY IN THE INTERMEDIATE LAYER
-
-
-
-%% FEEDFORWARD CONNECTIVITY FROM INTERMEDIATE LAYER TO OUTPUT POPULATION
-
-
-
-% get rid of the ridges in the activity profile of the intermediate layer
-% and keep only the bump of activity -> DoG connectivity (Mexican Hat)
-% which brings short range excitation and long range inhibition
-
-%% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY
+%% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY (ONLY FEEDFORWARD PROP.)
 %intermediate layer activity
 % intialize the projected activity on the intermediate layer in aux var
 % just for visualization 
 projected_activity = zeros(neurons_complete_x, neurons_complete_y);
-subplot(6,3,[8 11]);
+subplot(6, 4, [10 14]);
+for i=1:neurons_complete_x
+    for j=1:neurons_complete_y
+        projected_activity(i,j) = projection_layer(i,j).rij;
+    end
+end
+mesh([x_population.vi], [y_population.vi], projected_activity);
+grid off;
+set(gca, 'Box', 'off');  
+
+%% RECURRENT CONNECTIVITY IN THE INTERMEDIATE LAYER
+
+% get rid of the ridges in the activity profile of the intermediate layer
+% keep only the bump of activity (Mexican hat - Difference Of Gaussians)
+
+% parameters that control the shape of the W connectivity matrix in the
+% intermediate layer 
+We      = 1.6; % short range excitation strength We > Wi
+Wi      = 0.6; % long range inhibition strength 
+sigma_e = 5;  % excitation Gaussian profile sigma_e < sigma_i
+sigma_i = 10;  % inhibiton Gaussian profile
+W = zeros(neurons_complete_x, neurons_complete_y);
+
+% build the recurrent connectivity matrix
+for i=1:neurons_complete_x
+    for j=1:neurons_complete_y
+        for k = 1:neurons_complete_x
+            for l = 1:neurons_complete_y
+                W(i,j) = We*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_e^2))) - ...
+                      Wi*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_i^2)));
+            end
+        end
+    end
+end
+
+% stores the summed input activity for recurrent connecitons in intermed.
+% layer
+sum_hist_recurrent = zeros(neurons_complete_x, neurons_complete_y);
+
+% build up the recurrent conenctivity matrix in the intermediate layer
+for i=1:neurons_complete_x
+    for j=1:neurons_complete_y
+        % reinit sum for every neuron in the intermediate layer
+        sum_rx = 0.0;
+        sum_ry = 0.0;
+        % recurrent connection contribution 
+        sum_recurrent = 0.0;
+        
+        % each input population contribution 
+        for k = 1:neurons_complete_x
+            sum_rx = sum_rx + J(i,k)*x_population(k).ri;
+        end
+        for l = 1:neurons_complete_y
+            sum_ry = sum_ry + J(j,l)*y_population(l).ri;
+        end
+        
+        % recurrent connectivity contribution 
+        
+        
+        % update history of activities
+        sum_hist_rx(i,j) = sum_rx;
+        sum_hist_ry(i,j) = sum_ry;
+        sum_hist_recurrent(i,j) = sum_recurrent;
+        
+        % superimpose contributions from both populations and reccurency
+        rxy = sum_rx + sum_ry + sum_recurrent;
+        
+        % update history for the intermediate layer neurons
+        rxy_hist(i,j) = rxy;
+    end
+end
+
+% assemble the intermediate layer and fill in with activity values
+for i  = 1:neurons_complete_x
+    for j = 1:neurons_complete_y
+        % normalize the total activity such that we have consistent 
+        % rate in the intermediate layer bound to [bkg_firing, max_firing]
+        rxy_normed(i,j) = bkg_firing + ...
+            ((rxy_hist(i,j) - min(rxy_hist(:)))*...
+            (max_firing - bkg_firing))/...
+            (max(rxy_hist(:) - min(rxy_hist(:))));
+        switch(activation_type)
+            case 'sigmoid'
+                % compute the activation for each neuron - sigmoid activation 
+                rij(i,j) = sigmoid(max_firing, ...
+                                   max_firing/sigmoid_polarity_switch, ...
+                                   rxy_normed(i,j));
+            case 'linear'
+                % compute the activation for each neuron - linear activation
+                rij(i,j) = rxy_normed(i,j);
+        end
+        % build up the intermediate projection layer
+        projection_layer(i,j) = struct('i', i, ...
+                                       'j', j, ...
+                                       'rij', rij(i,j));
+    end
+end
+
+%% FEEDFORWARD CONNECTIVITY FROM INTERMEDIATE LAYER TO OUTPUT POPULATION
+
+
+%% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY (AFTER DYNAMICS)
+% intermediate layer activity after net dynamics relaxed
+projected_activity = zeros(neurons_complete_x, neurons_complete_y);
+subplot(6, 4, [11 15]);
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
         projected_activity(i,j) = projection_layer(i,j).rij;
