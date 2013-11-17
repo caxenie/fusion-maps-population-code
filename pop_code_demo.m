@@ -31,7 +31,7 @@ sigmoid_polarity_switch = 1.1765;
 %   ri      - activity of the neuron (firing rate)
 %   fi      - tuning curve (e.g. Gaussian)
 %   vi      - preferred value - even distribution in the range
-%   etai    - noise value - zero mean and tipically correlated
+%   etai    - neuronal noise value - zero mean and tipically correlated
 
 % scaling factor for tuning curves
 bkg_firing = 10; % spk/s - background firing rate
@@ -47,7 +47,7 @@ encoded_val_z = 54;
 % preallocate
 vix=zeros(1, neurons_complete_x);
 
-% zero mean noise 
+% zero mean neuronal noise 
 etax = randn(neurons_complete_x, 1)*noise_scale;
 % population standard deviation -> coarse (big val) / sharp (small val) receptive field
 sigma_x = 10;
@@ -78,7 +78,7 @@ end;
 % preallocate
 viy=zeros(1, neurons_complete_y);
  
-% zero mean noise
+% zero mean neuronal noise 
 etay = randn(neurons_complete_y, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
 sigma_y = 10;
@@ -108,7 +108,7 @@ end;
 % preallocate
 viz=zeros(1, neurons_complete_z);
  
-% zero mean noise
+% zero mean neuronal noise 
 etaz = randn(neurons_complete_z, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
 sigma_z = 10;
@@ -278,22 +278,36 @@ xlabel('Preferred value');
 % assuming we are projecting the populations x and y and population z will
 % encode an arbitrary function phi: z = phi(x, y)
 
+%% FEEDFORWARD NETWORK CONNECTIVITY FROM INPUTS TO INTERMEDIATE LAYER
 % connectivity matrix initialization
 omega_h = 1;
 omega_l = 0;
 sigma_rx = 0.0;
 sigma_ry = 0.0;
+
 % connectivity matrix random initialization
-J = omega_l + ((omega_h - omega_l)/4).*rand(neurons_complete_x, neurons_complete_y);
-% sharp peak of J at i=j
+J =  omega_l + ((omega_h - omega_l)/100).*rand(neurons_complete_x, neurons_complete_y);
+% connectivity matrix type {smooth, sharp}
+J_type = 'smooth';
+
+% sharply peaked of J at i=j
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
-        if(i==j)
-           J(i,j) = omega_h;                                                                                                                               
+        % switch profile of weight matrix such that a more smoother
+        switch(J_type)
+            case 'smooth'
+                % projection in the intermediate layer is obtained - Gauss
+                J(i,j) = exp(-((i-j))^2/(2*(neurons_complete_x/10)*(neurons_complete_x/10)));
+            case 'sharp'
+                % for linear (sharp) profile of the weight matrix the
+                % projection in the intermediate layer is noisier
+                if(i==j)
+                    J(i,j) = 1;
+                end
+        end
         end
     end
-end
-
+    
 % stores the summed input activity for each neuron before intermediate
 % layer
 sigma_hist_rx = zeros(1, neurons_complete_x);
@@ -318,20 +332,13 @@ for i=1:neurons_complete_x
         for l = 1:neurons_complete_y
             sigma_ry = sigma_ry + J(j,l)*y_population(l).ri;
         end
-        
-        % --------------------------------
         % update history of activities
         sigma_hist_rx(i,j) = sigma_rx;
         sigma_hist_ry(i,j) = sigma_ry;
-        % --------------------------------
-        
         % superimpose contributions from both populations 
         rxy = sigma_rx + sigma_ry;
-        
-        % --------------------------------
         % update history for the intermediate layer neurons
         rxy_hist(i,j) = rxy;
-        % --------------------------------
     end
 end
 
@@ -339,6 +346,11 @@ end
 rxy_normed = zeros(neurons_complete_x, neurons_complete_y);
 % final activity of a neuron in the intermediate layer 
 rij = zeros(neurons_complete_x, neurons_complete_y);
+
+% choose the type of activation function for the projection step
+% for the learning phase we might use a different activation function 
+% activation_type = {linear, sigmoid}
+activation_type = 'linear';
 
 % assemble the intermediate layer and fill in with activity values
 for i  = 1:neurons_complete_x
@@ -349,23 +361,35 @@ for i  = 1:neurons_complete_x
             ((rxy_hist(i,j) - min(rxy_hist(:)))*...
             (max_firing - bkg_firing))/...
             (max(rxy_hist(:) - min(rxy_hist(:))));
+        switch(activation_type)
+            case 'sigmoid'
+                % compute the activation for each neuron - sigmoid activation 
+                rij(i,j) = sigmoid(max_firing, ...
+                                   max_firing/sigmoid_polarity_switch, ...
+                                   rxy_normed(i,j));
+            case 'linear'
+                % compute the activation for each neuron - linear activation
+                rij(i,j) = rxy_normed(i,j);
+        end
         % build up the intermediate projection layer
-        % compute the activation for each neuron 
-        rij(i,j) = sigmoid(max_firing, ...
-                           max_firing/sigmoid_polarity_switch, ...
-                           rxy_normed(i,j));
         projection_layer(i,j) = struct('i', i, ...
                                        'j', j, ...
                                        'rij', rij(i,j));
-        
     end
 end
+%% RECURRENT CONNECTIVITY IN THE INTERMEDIATE LAYER
+
+
+
+%% FEEDFORWARD CONNECTIVITY FROM INTERMEDIATE LAYER TO OUTPUT POPULATION
+
+
 
 % get rid of the ridges in the activity profile of the intermediate layer
 % and keep only the bump of activity -> DoG connectivity (Mexican Hat)
 % which brings short range excitation and long range inhibition
 
-%% VISUALIZATION
+%% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY
 %intermediate layer activity
 % intialize the projected activity on the intermediate layer in aux var
 % just for visualization 
@@ -376,6 +400,6 @@ for i=1:neurons_complete_x
         projected_activity(i,j) = projection_layer(i,j).rij;
     end
 end
-mesh(1:neurons_complete_x, 1:neurons_complete_y, projected_activity);
+mesh([x_population.vi], [y_population.vi], projected_activity);
 grid off;
 set(gca, 'Box', 'off');  
