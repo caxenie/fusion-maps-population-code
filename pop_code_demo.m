@@ -367,12 +367,13 @@ for i  = 1:neurons_complete_x
                 % compute the activation for each neuron - linear activation
                 rij(i,j) = rxy_normed(i,j);
         end
-        % build up the intermediate projection layer
+        % build up the intermediate projection layer (no recurrency)
         projection_layer(i,j) = struct('i', i, ...
                                        'j', j, ...
                                        'rij', rij(i,j));
     end
 end
+
 %% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY (ONLY FEEDFORWARD PROP.)
 %intermediate layer activity
 % intialize the projected activity on the intermediate layer in aux var
@@ -412,18 +413,29 @@ for i=1:neurons_complete_x
         end
     end
 end
+
 % stores the summed input activity for recurrent connections in intermed.
 % layer
 sum_hist_recurrent = zeros(neurons_complete_x, neurons_complete_y);
 % stores the (un-normalized) activity of a neuron in the intermed. layer
 interm_activities = zeros(neurons_complete_x, neurons_complete_y);
-% history of activity values while relaxing into a stable state
-rxy_hist_old = 0;
 
 % build up the recurrent conectivity matrix in the intermediate layer so
 % that the ridges are eliminated from the intermediate layer and only the
 % bump persists
 
+% using recurrency we have to introduce a dynamics (line attractor)
+convergence_steps = 1;
+% dynamics of the relaxation in the intermediate layer
+rij_dot = zeros(neurons_complete_x, neurons_complete_y);
+rij_dot_ant = 0;
+
+rij_final = zeros(neurons_complete_x, neurons_complete_y, convergence_steps);
+rij_final_ant = 0;
+projection_layer_complete_ant = 0;
+
+for t = 1:convergence_steps  
+% loop through the projection layer (intermediate layer)    
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
         % reinit sum for every neuron in the intermediate layer
@@ -445,8 +457,11 @@ for i=1:neurons_complete_x
         
         % recurrent connectivity contribution
         for k = 1:neurons_complete_x
-            for l = 1:neurons_complete_y 
-                sum_recurrent = sum_recurrent + W(i,j)*interm_activities(k,l);
+            for l = 1:neurons_complete_y
+                if(k~=i && l~=j)
+                    sum_recurrent = sum_recurrent + W(i,j)*...
+                                                    rxy_hist(k,l);
+                end
             end
         end
         
@@ -456,7 +471,7 @@ for i=1:neurons_complete_x
         sum_hist_recurrent(i,j) = sum_recurrent;
         
         % superimpose contributions from both populations and reccurency
-        rxy = sum_rx + sum_ry + sum_recurrent;
+        rxy = interm_activities(i,j) + sum_hist_recurrent(i,j);
         
         % update history for the intermediate layer neurons
         rxy_hist(i,j) = rxy;
@@ -477,12 +492,24 @@ for i=1:neurons_complete_x
                 % compute the activation for each neuron - linear activation
                 rij(i,j) = rxy_normed(i,j);
         end
-        % build up the intermediate projection layer
-        projection_layer(i,j) = struct('i', i, ...
+        % build up the intermediate projection layer (including recurrency)
+        projection_layer_complete(i,j) = struct('i', i, ...
                                        'j', j, ...
                                        'rij', rij(i,j));
+                                   
+        % compute the change in activity
+        rij_dot(i,j) = projection_layer_complete(i,j).rij;
+        rij_final(i,j,t) = rij_final_ant + (0.1*(rij_dot(i,j) + rij_dot_ant)*.5);
+        % update history 
+        rij_dot_ant = rij_dot(i,j);
+        rij_final_ant = rij_final(i,j,t); 
     end
 end
+end % convergence steps
+
+close all;
+mesh(1:neurons_complete_x, 1:neurons_complete_y, sum_hist_recurrent(1:neurons_complete_x, 1:neurons_complete_y))
+return 
 
 %% FEEDFORWARD CONNECTIVITY FROM INTERMEDIATE LAYER TO OUTPUT POPULATION
 % after relaxation the intermediate layer activity is projected onto the
@@ -497,7 +524,7 @@ projected_activity = zeros(neurons_complete_x, neurons_complete_y);
 subplot(6, 4, [11 15]);
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
-        projected_activity(i,j) = projection_layer(i,j).rij;
+        projected_activity(i,j) = rij_final(i,j,convergence_steps);
     end
 end
 mesh([x_population.vi], [y_population.vi], projected_activity);
