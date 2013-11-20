@@ -396,23 +396,31 @@ set(gca, 'Box', 'off');
 
 % parameters that control the shape of the W connectivity matrix in the
 % intermediate layer 
-We      = 1.5; % short range excitation strength We > Wi
+We      = 10.0; % short range excitation strength We > Wi
 Wi      = 0.5; % long range inhibition strength 
-sigma_e = 10;  % excitation Gaussian profile sigma_e < sigma_i
-sigma_i = 20;  % inhibiton Gaussian profile
-W = zeros(neurons_complete_x, neurons_complete_y);
+sigma_e = 7;    % excitation Gaussian profile sigma_e < sigma_i
+sigma_i = 14;    % inhibiton Gaussian profile
+W = zeros(neurons_complete_x, neurons_complete_y, neurons_complete_x, neurons_complete_y);
 
 % build the recurrent connectivity matrix
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
-        for k = 1:neurons_complete_x-i
-            for l = 1:neurons_complete_y-j
-                W(i,j) = We*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_e^2))) - ...
-                         Wi*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_i^2)));
+        for k = 1:neurons_complete_x
+            for l = 1:neurons_complete_y
+                W(i,j,k,l) = We*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_e^2))) - ...
+                             Wi*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_i^2)));
             end
         end
     end
 end
+
+% % show animated movement of the mexican hat 
+% for i = 1:neurons_complete_x
+%     for j = 1:neurons_complete_y
+%         surf(W(1:neurons_complete_x, 1:neurons_complete_y, i, j));
+%         pause(0.1);
+%     end
+% end
 
 % stores the summed input activity for recurrent connections in intermed.
 % layer
@@ -425,7 +433,7 @@ interm_activities = zeros(neurons_complete_x, neurons_complete_y);
 % bump persists
 
 % using recurrency we have to introduce a dynamics (line attractor)
-convergence_steps = 1;
+convergence_steps = 3;
 % dynamics of the relaxation in the intermediate layer
 rij_dot = zeros(neurons_complete_x, neurons_complete_y);
 rij_dot_ant = 0;
@@ -459,8 +467,8 @@ for i=1:neurons_complete_x
         for k = 1:neurons_complete_x
             for l = 1:neurons_complete_y
                 if(k~=i && l~=j)
-                    sum_recurrent = sum_recurrent + W(i,j)*...
-                                                    rxy_hist(k,l);
+                    sum_recurrent = sum_recurrent + W(i,j, k, l)*...
+                                                    interm_activities(k,l);
                 end
             end
         end
@@ -498,18 +506,15 @@ for i=1:neurons_complete_x
                                        'rij', rij(i,j));
                                    
         % compute the change in activity
-        rij_dot(i,j) = projection_layer_complete(i,j).rij;
-        rij_final(i,j,t) = rij_final_ant + (0.1*(rij_dot(i,j) + rij_dot_ant)*.5);
+        rij_dot(i,j) = projection_layer_complete(i,j).rij - projection_layer_complete_ant;
+        rij_final(i,j,t) = rij_final_ant + ((rij_dot(i,j) + rij_dot_ant)*.5);
         % update history 
         rij_dot_ant = rij_dot(i,j);
         rij_final_ant = rij_final(i,j,t); 
+        projection_layer_complete_ant = projection_layer_complete(i,j).rij;
     end
 end
 end % convergence steps
-
-close all;
-mesh(1:neurons_complete_x, 1:neurons_complete_y, sum_hist_recurrent(1:neurons_complete_x, 1:neurons_complete_y))
-return 
 
 %% FEEDFORWARD CONNECTIVITY FROM INTERMEDIATE LAYER TO OUTPUT POPULATION
 % after relaxation the intermediate layer activity is projected onto the
