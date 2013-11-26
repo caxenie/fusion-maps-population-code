@@ -40,11 +40,11 @@ max_firing = 100;
 
 % ========================================================================
 % demo params 
-encoded_val_x = -45;
-encoded_val_y = 20;
+encoded_val_x = 35;
+encoded_val_y = 25;
 % the output should be computed depending on the embedded function phi 
 % this is just initialization
-encoded_val_z = 0;
+encoded_val_z = 5;
 % ========================================================================
 
 %% generate first population and initialize
@@ -54,7 +54,7 @@ vix=zeros(1, neurons_complete_x);
 % zero mean neuronal noise 
 etax = randn(neurons_complete_x, 1)*noise_scale;
 % population standard deviation -> coarse (big val) / sharp (small val) receptive field
-sigma_x = 10;
+sigma_x = 6;
 % population range of values (+/-)
 x_pop_range = 100;
 % peak to peak spacing in tuning curves
@@ -85,7 +85,7 @@ viy=zeros(1, neurons_complete_y);
 % zero mean neuronal noise 
 etay = randn(neurons_complete_y, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
-sigma_y = 10;
+sigma_y = 6;
 % population range of values (+/-)
 y_pop_range = 100;
 % peak to peak spacing in tuning curves
@@ -115,7 +115,7 @@ viz=zeros(1, neurons_complete_z);
 % zero mean neuronal noise 
 etaz = randn(neurons_complete_z, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
-sigma_z = 10;
+sigma_z = 6;
 % population range of values (+/-) 
 z_pop_range = 100;
 % peak to peak spacing in tuning curves
@@ -247,9 +247,13 @@ ylabel('Activity (spk/s)');
 subplot(6, 4, [21 22]);
 % make the encoding of the value in the population and add noise
 for i=1:neurons_complete_z
-    % output population initialized randomly as the activity will be given
-    % by the function embedded in phi
-    z_population(i).ri = etaz(i);
+    % output population initialized randomly with a value the final encoded 
+    % value will be determined by the function embedded in phi
+    z_population(i).ri = gauss_val(encoded_val_z, ...
+                                   z_population(i).vi, ...
+                                   sigma_z, ...
+                                   scaling_factor) + ...
+                                   etaz(i);
     % rate should be positive althought noise can make small vallues
     % negative
     z_population(i).ri = abs(z_population(i).ri);                               
@@ -267,7 +271,7 @@ for i=-z_pop_range:z_pop_range
 end;
 grid off;
 set(gca, 'Box', 'off');     
-title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_z));
+title('Noisy intialization activity of the population with a random value (t --> 0)');
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
 
@@ -356,7 +360,7 @@ for i  = 1:neurons_complete_x
         % rate in the intermediate layer bound to [bkg_firing, max_firing]
         rxy_normed(i,j) = bkg_firing + ...
             ((rxy_hist(i,j) - min(rxy_hist(:)))*...
-            (max_firing - bkg_firing))/...
+              (max_firing - bkg_firing))/...
             (max(rxy_hist(:) - min(rxy_hist(:))));
         switch(activation_type)
             case 'sigmoid'
@@ -380,7 +384,7 @@ end
 % intialize the projected activity on the intermediate layer in aux var
 % just for visualization 
 projected_activity = zeros(neurons_complete_x, neurons_complete_y);
-subplot(6, 4, [10 14]);
+h(1) = subplot(6, 4, [10 14]);
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
         projected_activity(i,j) = projection_layer(i,j).rij;
@@ -523,23 +527,38 @@ end % convergence steps
 % output population after relaxation (t->Inf)
 
 % sum of activity from intermediate layer to output layer
-sum_interm_out = 0;
+sum_interm_out = 0; 
 for i=1:neurons_complete_z
     sum_interm_out = 0;
     for j = 1:neurons_complete_x
         for k = 1:neurons_complete_y
-               sum_interm_out = sum_interm_out + ...
-                   G_map(z_population(i).ri - phi(x_population(j).ri, y_population(k).ri))*...
-                   projection_layer_complete(j, k).rij;
+            sum_interm_out = sum_interm_out + ...
+                             G_map(z_population(i).vi - phi(x_population(j).vi, y_population(k).vi))*...
+                             projection_layer_complete(j, k).rij;
         end
     end
     z_population(i).ri = sum_interm_out;
+end
+
+% normalize the activity in the output population 
+z_population_normed = zeros(1, neurons_complete_z);
+min_zpop = min([z_population(:).ri]);
+max_zpop = max([z_population(:).ri]);
+for i = 1:neurons_complete_z
+    z_population_normed(i) = bkg_firing + ...
+            ((z_population(i).ri - min_zpop)*...
+            (max_firing - bkg_firing))/...
+            (max_zpop - min_zpop);
+end
+       
+for i = 1:neurons_complete_z
+    z_population(i).ri  = z_population_normed(i);
 end
 %% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY (AFTER DYNAMICS)
 % intermediate layer activity after net dynamics relaxed
 projected_activity = zeros(neurons_complete_x, neurons_complete_y);
 
-subplot(6, 4, [11 15]);
+h(2) = subplot(6, 4, [11 15]);
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
         projected_activity(i,j) = rij_final(i,j,convergence_steps);
@@ -548,6 +567,9 @@ end
 mesh([x_population.vi], [y_population.vi], projected_activity);
 grid off;
 set(gca, 'Box', 'off');  
+
+% link axes for the 2 presentations of the intermediate layer activity
+linkprop([h(1) h(2)], 'CameraPosition');
 
 %plot the encoded value in the output population after the network relaxed
 %and the values are settles
@@ -562,8 +584,12 @@ for i=-z_pop_range:z_pop_range
         j = j+1;
     end;
 end;
+% the encoded value in the output population is given by the embedded
+% function phi
 grid off;
 set(gca, 'Box', 'off');     
-title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_z));
+% the output population peak
+[out_activity, peak_val] = max([z_population(:).ri]);
+title(sprintf('Noisy activity of the population encoding the value %d after relaxation (t --> Inf)', peak_val));
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
