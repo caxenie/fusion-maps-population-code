@@ -38,10 +38,14 @@ bkg_firing = 10; % spk/s - background firing rate
 scaling_factor = 80; % motivated by the typical background and upper spiking rates
 max_firing = 100;
 
+% ========================================================================
 % demo params 
 encoded_val_x = -45;
 encoded_val_y = 20;
-encoded_val_z = 54;
+% the output should be computed depending on the embedded function phi 
+% this is just initialization
+encoded_val_z = 0;
+% ========================================================================
 
 %% generate first population and initialize
 % preallocate
@@ -113,7 +117,7 @@ etaz = randn(neurons_complete_z, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
 sigma_z = 10;
 % population range of values (+/-) 
-z_pop_range = 200;
+z_pop_range = 100;
 % peak to peak spacing in tuning curves
 z_spacing = z_pop_range/((neurons_complete_z-1)/2);
 % init population
@@ -240,15 +244,12 @@ title('Tuning curves of the neural population');
 ylabel('Activity (spk/s)');
 
 % plot the encoded value in the population
-subplot(6, 4, [22 23]);
+subplot(6, 4, [21 22]);
 % make the encoding of the value in the population and add noise
 for i=1:neurons_complete_z
-    % scale the firing rate to proper values and compute fi
-    z_population(i).ri = gauss_val(encoded_val_z, ...
-                                   z_population(i).vi, ...
-                                   sigma_z, ...
-                                   scaling_factor) + ...
-                                   etaz(i);
+    % output population initialized randomly as the activity will be given
+    % by the function embedded in phi
+    z_population(i).ri = etaz(i);
     % rate should be positive althought noise can make small vallues
     % negative
     z_population(i).ri = abs(z_population(i).ri);                               
@@ -433,7 +434,7 @@ interm_activities = zeros(neurons_complete_x, neurons_complete_y);
 % bump persists
 
 % using recurrency we have to introduce a dynamics (line attractor)
-convergence_steps = 3;
+convergence_steps = 5;
 % dynamics of the relaxation in the intermediate layer
 rij_dot = zeros(neurons_complete_x, neurons_complete_y);
 rij_dot_ant = 0;
@@ -507,6 +508,7 @@ for i=1:neurons_complete_x
                                    
         % compute the change in activity
         rij_dot(i,j) = projection_layer_complete(i,j).rij - projection_layer_complete_ant;
+        % integrate activity in time (t->Inf)
         rij_final(i,j,t) = rij_final_ant + ((rij_dot(i,j) + rij_dot_ant)*.5);
         % update history 
         rij_dot_ant = rij_dot(i,j);
@@ -518,10 +520,21 @@ end % convergence steps
 
 %% FEEDFORWARD CONNECTIVITY FROM INTERMEDIATE LAYER TO OUTPUT POPULATION
 % after relaxation the intermediate layer activity is projected onto the
-% output population
+% output population after relaxation (t->Inf)
 
-
-
+% sum of activity from intermediate layer to output layer
+sum_interm_out = 0;
+for i=1:neurons_complete_z
+    sum_interm_out = 0;
+    for j = 1:neurons_complete_x
+        for k = 1:neurons_complete_y
+               sum_interm_out = sum_interm_out + ...
+                   G_map(z_population(i).ri - phi(x_population(j).ri, y_population(k).ri))*...
+                   projection_layer_complete(j, k).rij;
+        end
+    end
+    z_population(i).ri = sum_interm_out;
+end
 %% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY (AFTER DYNAMICS)
 % intermediate layer activity after net dynamics relaxed
 projected_activity = zeros(neurons_complete_x, neurons_complete_y);
@@ -535,3 +548,22 @@ end
 mesh([x_population.vi], [y_population.vi], projected_activity);
 grid off;
 set(gca, 'Box', 'off');  
+
+%plot the encoded value in the output population after the network relaxed
+%and the values are settles
+subplot(6, 4, [23 24]);
+% plot the noisy hill of population activity 
+j = 1;
+for i=-z_pop_range:z_pop_range
+    % display on even spacing of the entire input domain
+    if(rem(i, z_spacing)==0)
+        plot(i, z_population(j).ri, 'o');
+        hold all;
+        j = j+1;
+    end;
+end;
+grid off;
+set(gca, 'Box', 'off');     
+title(sprintf('Noisy activity of the population encoding the value %d', encoded_val_z));
+ylabel('Activity (spk/s)');
+xlabel('Preferred value');
