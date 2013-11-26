@@ -40,11 +40,11 @@ max_firing = 100;
 
 % ========================================================================
 % demo params 
-encoded_val_x = 35;
-encoded_val_y = 25;
+encoded_val_x = 30;
+encoded_val_y = 20;
 % the output should be computed depending on the embedded function phi 
 % this is just initialization
-encoded_val_z = 5;
+encoded_val_z = 0 ;
 % ========================================================================
 
 %% generate first population and initialize
@@ -534,7 +534,7 @@ for i=1:neurons_complete_z
         for k = 1:neurons_complete_y
             sum_interm_out = sum_interm_out + ...
                              G_map(z_population(i).vi - phi(x_population(j).vi, y_population(k).vi))*...
-                             projection_layer_complete(j, k).rij;
+                             (rij_final(j, k, convergence_steps)/neurons_complete_z);
         end
     end
     z_population(i).ri = sum_interm_out;
@@ -561,7 +561,7 @@ projected_activity = zeros(neurons_complete_x, neurons_complete_y);
 h(2) = subplot(6, 4, [11 15]);
 for i=1:neurons_complete_x
     for j=1:neurons_complete_y
-        projected_activity(i,j) = rij_final(i,j,convergence_steps);
+        projected_activity(i,j) = rij_final(i,j,convergence_steps); % final value after relaxation
     end
 end
 mesh([x_population.vi], [y_population.vi], projected_activity);
@@ -588,8 +588,6 @@ end;
 % function phi
 grid off;
 set(gca, 'Box', 'off');     
-% the output population peak
-[out_activity, peak_val] = max([z_population(:).ri]);
-title(sprintf('Noisy activity of the population encoding the value %d after relaxation (t --> Inf)', peak_val));
+title(sprintf('Noisy activity of the population encoding the value %d after relaxation (t --> Inf)', phi(encoded_val_x, encoded_val_y)));
 ylabel('Activity (spk/s)');
 xlabel('Preferred value');
