@@ -21,10 +21,7 @@ neurons_pop_z = 50;
 neurons_complete_x = neurons_pop_x + 1;  % number of neurons in the input populations
 neurons_complete_y = neurons_pop_y + 1;
 neurons_complete_z = neurons_pop_z + 1;
-noise_scale = 7;
-
-%% HACK polarity change in sigmoid activation function
-sigmoid_polarity_switch = 1.1765;
+noise_scale = 10;
 
 % neuron information (neuron index i)
 %   i       - index in the population 
@@ -35,106 +32,108 @@ sigmoid_polarity_switch = 1.1765;
 
 % scaling factor for tuning curves
 bkg_firing = 10; % spk/s - background firing rate
-scaling_factor = 80; % motivated by the typical background and upper spiking rates
-max_firing = 100;
+max_firing = 100;% spk/s - maximum firing rate
 
 % ========================================================================
 % demo params 
-encoded_val_x = 30;
-encoded_val_y = 20;
+encoded_val_x = -30;
+encoded_val_y = -10;
 % the output should be computed depending on the embedded function phi 
-% this is just initialization
+% this is just initialization 
 encoded_val_z = 0 ;
 % ========================================================================
+
+% choose the type of activation function for the projection step
+% for the learning phase we might use a different activation function 
+% activation_type = {linear, sigmoid}
+projection_activation_type = 'linear';
+learning_activation_type = 'sigmoid';
 
 %% generate first population and initialize
 % preallocate
 vix=zeros(1, neurons_complete_x);
-
 % zero mean neuronal noise 
 etax = randn(neurons_complete_x, 1)*noise_scale;
 % population standard deviation -> coarse (big val) / sharp (small val) receptive field
-sigma_x = 6;
+sigma_x = 10;
 % population range of values (+/-)
 x_pop_range = 100;
 % peak to peak spacing in tuning curves
 x_spacing = x_pop_range/((neurons_complete_x-1)/2);
 
 % init population
-for i=1:neurons_complete_x
+for idx=1:neurons_complete_x
     % evenly distributed preferred values in the interval
-    vix(i) = -x_pop_range+(i-1)*(x_pop_range/((neurons_complete_x-1)/2));
+    vix(idx) = -x_pop_range+(idx-1)*(x_pop_range/((neurons_complete_x-1)/2));
     % tuning curve of the neuron
-    [pts, vals] = gauss_tuning(vix(i), ...
+    [pts, vals] = gauss_tuning(vix(idx), ...
                                sigma_x, ...
                                x_pop_range, ...
-                               scaling_factor);
-    fix(i).p = pts;
-    fix(i).v = vals;
-    x_population(i) = struct('i',   i, ...
-                            'vi',   vix(i),...
-                            'fi',   fix(i), ...
-                            'etai', etax(i),...
+                               max_firing);
+    fix(idx).p = pts;
+    fix(idx).v = vals;
+    x_population(idx) = struct('i',   idx, ...
+                            'vi',   vix(idx),...
+                            'fi',   fix(idx), ...
+                            'etai', etax(idx),...
                             'ri',   abs(randi([bkg_firing , max_firing])));
 end;
 
 %% generate second population and initialize
 % preallocate
 viy=zeros(1, neurons_complete_y);
- 
 % zero mean neuronal noise 
 etay = randn(neurons_complete_y, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
-sigma_y = 6;
+sigma_y = 10;
 % population range of values (+/-)
 y_pop_range = 100;
 % peak to peak spacing in tuning curves
 y_spacing = y_pop_range/((neurons_complete_y-1)/2);
 % init population
-for i=1:neurons_complete_y
+for idx=1:neurons_complete_y
     % evenly distributed preferred values in the interval
-    viy(i) = -y_pop_range+(i-1)*(y_pop_range/((neurons_complete_y-1)/2));
+    viy(idx) = -y_pop_range+(idx-1)*(y_pop_range/((neurons_complete_y-1)/2));
     % tuning curve of the neuron
-    [pts, vals] = gauss_tuning(viy(i), ...
+    [pts, vals] = gauss_tuning(viy(idx), ...
                                sigma_y, ...
                                y_pop_range, ...
-                               scaling_factor);
-    fiy(i).p = pts;
-    fiy(i).v = vals;
-    y_population(i) = struct('i',   i, ...
-                            'vi',   viy(i),...
-                            'fi',   fiy(i), ...
-                            'etai', etay(i),...
+                               max_firing);
+    fiy(idx).p = pts;
+    fiy(idx).v = vals;
+    y_population(idx) = struct('i',   idx, ...
+                            'vi',   viy(idx),...
+                            'fi',   fiy(idx), ...
+                            'etai', etay(idx),...
                             'ri',   abs(randi([bkg_firing , max_firing])));
 end;
 
 %% generate third population and initialize
 % preallocate
 viz=zeros(1, neurons_complete_z);
- 
 % zero mean neuronal noise 
 etaz = randn(neurons_complete_z, 1)*noise_scale;
 % population standard deviation - coarse (big val) / sharp receptive field
-sigma_z = 6;
+sigma_z = 10;
 % population range of values (+/-) 
 z_pop_range = 100;
 % peak to peak spacing in tuning curves
 z_spacing = z_pop_range/((neurons_complete_z-1)/2);
 % init population
-for i=1:neurons_complete_z
+for idx=1:neurons_complete_z
     % evenly distributed preferred values in the interval
-    viz(i) = -z_pop_range+(i-1)*(z_pop_range/((neurons_complete_z-1)/2));
+    viz(idx) = -z_pop_range+(idx-1)*(z_pop_range/((neurons_complete_z-1)/2));
     % tuning curve of the neuron
-    [pts, vals] = gauss_tuning(viz(i), ...
+    [pts, vals] = gauss_tuning(viz(idx), ...
                                sigma_z, ...
                                z_pop_range, ...
-                               scaling_factor);
-    fiz(i).p = pts;
-    fiz(i).v = vals;
-    z_population(i) = struct('i',   i, ...
-                            'vi',   viz(i),...
-                            'fi',   fiz(i), ...
-                            'etai', etaz(i),...
+                               max_firing);
+    fiz(idx).p = pts;
+    fiz(idx).v = vals;
+    z_population(idx) = struct('i',   idx, ...
+                            'vi',   viz(idx),...
+                            'fi',   fiz(idx), ...
+                            'etai', etaz(idx),...
                             'ri',   randi([bkg_firing , max_firing]));
 end;
 %% VISUALIZATION
@@ -144,8 +143,8 @@ set(gcf,'color','w');
 % first population 
 % plot the tunning curves of all neurons for the first population
 subplot(6, 4, [1 2]);
-for i=1:neurons_complete_x
-    plot(x_population(i).fi.p, x_population(i).fi.v);
+for idx=1:neurons_complete_x
+    plot(x_population(idx).fi.p, x_population(idx).fi.v);
     hold all;
 end;
 grid off;
@@ -162,26 +161,26 @@ etax = randn(neurons_complete_x, 1)*noise_scale;
 etay = randn(neurons_complete_y, 1)*noise_scale;
 etaz = randn(neurons_complete_z, 1)*noise_scale;
 
-for i=1:neurons_complete_x
+for idx=1:neurons_complete_x
     % scale the firing rate to proper values and compute fi
-    x_population(i).ri = gauss_val(encoded_val_x, ...
-                                   x_population(i).vi, ...
+    x_population(idx).ri = gauss_val(encoded_val_x, ...
+                                   x_population(idx).vi, ...
                                    sigma_x, ...
-                                   scaling_factor) + ...
-                                   etax(i);
-    % rate should be positive althought noise can make small vallues
+                                   max_firing) + ...
+                                   etax(idx);
+    % rate should be positive althought noise can make small values
     % negative
-    x_population(i).ri = abs(x_population(i).ri);
+    x_population(idx).ri = abs(x_population(idx).ri);
 end;
 % plot the noisy hill of population activity encoding the given value
 % index for neurons
-j = 1;
-for i=-x_pop_range:x_pop_range
+jdx = 1;
+for idx=-x_pop_range:x_pop_range
     % display on even spacing of the entire input domain
-    if(rem(i, x_spacing)==0)
-        plot(i, x_population(j).ri, 'o');
+    if(rem(idx, x_spacing)==0)
+        plot(idx, x_population(jdx).ri, 'o');
         hold all;
-        j = j+1;
+        jdx = jdx+1;
     end;
 end; 
 grid off;
@@ -192,8 +191,8 @@ xlabel('Preferred value');
 
 % second population 
 subplot(6, 4, [3 4]);
-for i=1:neurons_complete_y
-    plot(y_population(i).fi.p, y_population(i).fi.v);
+for idx=1:neurons_complete_y
+    plot(y_population(idx).fi.p, y_population(idx).fi.v);
     hold all;
 end;
 grid off;
@@ -204,26 +203,26 @@ ylabel('Activity (spk/s)');
 % plot the encoded value in the population
 subplot(6, 4, [7 8]);
 % make the encoding of the value in the population and add noise
-for i=1:neurons_complete_y
+for idx=1:neurons_complete_y
     % scale the firing rate to proper values and compute fi
-    y_population(i).ri = gauss_val(encoded_val_y, ...
-                                   y_population(i).vi, ...
+    y_population(idx).ri = gauss_val(encoded_val_y, ...
+                                   y_population(idx).vi, ...
                                    sigma_y, ...
-                                   scaling_factor) + ...
-                                   etay(i);
+                                   max_firing) + ...
+                                   etay(idx);
     % rate should be positive althought noise can make small vallues
     % negative
-    y_population(i).ri = abs(y_population(i).ri);                               
+    y_population(idx).ri = abs(y_population(idx).ri);                               
 end;
 % plot the noisy hill of population activity encoding the given value
 % index for neurons
-j = 1;
-for i=-y_pop_range:y_pop_range
+jdx = 1;
+for idx=-y_pop_range:y_pop_range
     % display on even spacing of the entire input domain
-    if(rem(i, y_spacing)==0)
-        plot(i, y_population(j).ri, 'o');
+    if(rem(idx, y_spacing)==0)
+        plot(idx, y_population(jdx).ri, 'o');
         hold all;
-        j = j+1;
+        jdx = jdx+1;
     end;
 end;
 grid off;
@@ -234,8 +233,8 @@ xlabel('Preferred value');
 
 % third population 
 subplot(6, 4, [18 19]);
-for i=1:neurons_complete_z
-    plot(z_population(i).fi.p, z_population(i).fi.v);
+for idx=1:neurons_complete_z
+    plot(z_population(idx).fi.p, z_population(idx).fi.v);
     hold all;
 end;
 grid off;
@@ -246,27 +245,27 @@ ylabel('Activity (spk/s)');
 % plot the encoded value in the population
 subplot(6, 4, [21 22]);
 % make the encoding of the value in the population and add noise
-for i=1:neurons_complete_z
+for idx=1:neurons_complete_z
     % output population initialized randomly with a value the final encoded 
     % value will be determined by the function embedded in phi
-    z_population(i).ri = gauss_val(encoded_val_z, ...
-                                   z_population(i).vi, ...
+    z_population(idx).ri = gauss_val(encoded_val_z, ...
+                                   z_population(idx).vi, ...
                                    sigma_z, ...
-                                   scaling_factor) + ...
-                                   etaz(i);
+                                   max_firing) + ...
+                                   etaz(idx);
     % rate should be positive althought noise can make small vallues
     % negative
-    z_population(i).ri = abs(z_population(i).ri);                               
+    z_population(idx).ri = abs(z_population(idx).ri);                               
 end;
 % plot the noisy hill of population activity encoding the given value
 % index for neurons
-j = 1;
-for i=-z_pop_range:z_pop_range
+jdx = 1;
+for idx=-z_pop_range:z_pop_range
     % display on even spacing of the entire input domain
-    if(rem(i, z_spacing)==0)
-        plot(i, z_population(j).ri, 'o');
+    if(rem(idx, z_spacing)==0)
+        plot(idx, z_population(jdx).ri, 'o');
         hold all;
-        j = j+1;
+        jdx = jdx+1;
     end;
 end;
 grid off;
@@ -285,7 +284,7 @@ xlabel('Preferred value');
 omega_h = 1;
 omega_l = 0;
 sum_rx = 0.0;
-sum_ry = 0.0;
+sum_ry = 0.0;       
 
 % connectivity matrix random initialization
 J =  omega_l + ((omega_h - omega_l)/100).*rand(neurons_complete_x, neurons_complete_y);
@@ -293,18 +292,18 @@ J =  omega_l + ((omega_h - omega_l)/100).*rand(neurons_complete_x, neurons_compl
 J_type = 'smooth';
 
 % sharply peaked of J at i=j
-for i=1:neurons_complete_x
-    for j=1:neurons_complete_y
+for idx=1:neurons_complete_x
+    for jdx=1:neurons_complete_y
         % switch profile of weight matrix such that a more smoother
         switch(J_type)
             case 'smooth'
                 % projection in the intermediate layer is obtained - Gauss
-                J(i,j) = exp(-((i-j))^2/(2*(neurons_complete_x/10)*(neurons_complete_x/10)));
+                J(idx,jdx) = exp(-((idx-jdx))^2/(2*(neurons_complete_x/10)*(neurons_complete_x/10)));
             case 'sharp'
                 % for linear (sharp) profile of the weight matrix the
                 % projection in the intermediate layer is noisier
-                if(i==j)
-                    J(i,j) = 1;
+                if(idx==jdx)
+                    J(idx,jdx) = 1;
                 end
         end
         end
@@ -320,26 +319,26 @@ sum_hist_ry = zeros(1, neurons_complete_y);
 rxy_hist = zeros(neurons_complete_x, neurons_complete_y);
 
 % compute the total input for each neuron in the intermediate layers
-for i=1:neurons_complete_x
-    for j=1:neurons_complete_y
+for idx=1:neurons_complete_x
+    for jdx=1:neurons_complete_y
         % reinit sum for every neuron in the intermediate layer
         sum_rx = 0.0;
         sum_ry = 0.0;
 
         % each input population contribution 
         for k = 1:neurons_complete_x
-            sum_rx = sum_rx + J(i,k)*x_population(k).ri;
+            sum_rx = sum_rx + J(idx,k)*x_population(k).ri;
         end
         for l = 1:neurons_complete_y
-            sum_ry = sum_ry + J(j,l)*y_population(l).ri;
+            sum_ry = sum_ry + J(jdx,l)*y_population(l).ri;
         end
         % update history of activities
-        sum_hist_rx(i,j) = sum_rx;
-        sum_hist_ry(i,j) = sum_ry;
+        sum_hist_rx(idx,jdx) = sum_rx;
+        sum_hist_ry(idx,jdx) = sum_ry;
         % superimpose contributions from both populations 
         rxy = sum_rx + sum_ry;
         % update history for the intermediate layer neurons
-        rxy_hist(i,j) = rxy;
+        rxy_hist(idx,jdx) = rxy;
     end
 end
 
@@ -348,34 +347,29 @@ rxy_normed = zeros(neurons_complete_x, neurons_complete_y);
 % final activity of a neuron in the intermediate layer 
 rij = zeros(neurons_complete_x, neurons_complete_y);
 
-% choose the type of activation function for the projection step
-% for the learning phase we might use a different activation function 
-% activation_type = {linear, sigmoid}
-activation_type = 'linear';
-
 % assemble the intermediate layer and fill in with activity values
-for i  = 1:neurons_complete_x
-    for j = 1:neurons_complete_y
+for idx  = 1:neurons_complete_x
+    for jdx = 1:neurons_complete_y
         % normalize the total activity such that we have consistent 
         % rate in the intermediate layer bound to [bkg_firing, max_firing]
-        rxy_normed(i,j) = bkg_firing + ...
-            ((rxy_hist(i,j) - min(rxy_hist(:)))*...
+        rxy_normed(idx,jdx) = bkg_firing + ...
+            ((rxy_hist(idx,jdx) - min(rxy_hist(:)))*...
               (max_firing - bkg_firing))/...
             (max(rxy_hist(:) - min(rxy_hist(:))));
-        switch(activation_type)
+        switch(projection_activation_type)
             case 'sigmoid'
                 % compute the activation for each neuron - sigmoid activation 
-                rij(i,j) = sigmoid(max_firing, ...
-                                   max_firing/sigmoid_polarity_switch, ...
-                                   rxy_normed(i,j));
+                rij(idx,jdx) = sigmoid(max_firing, ...
+                                       max_firing, ...
+                                       rxy_normed(idx,jdx));
             case 'linear'
                 % compute the activation for each neuron - linear activation
-                rij(i,j) = rxy_normed(i,j);
+                rij(idx,jdx) = rxy_normed(idx,jdx);
         end
         % build up the intermediate projection layer (no recurrency)
-        projection_layer(i,j) = struct('i', i, ...
-                                       'j', j, ...
-                                       'rij', rij(i,j));
+        projection_layer(idx,jdx) = struct('i', idx, ...
+                                       'j', jdx, ...
+                                       'rij', rij(idx,jdx));
     end
 end
 
@@ -385,9 +379,9 @@ end
 % just for visualization 
 projected_activity = zeros(neurons_complete_x, neurons_complete_y);
 h(1) = subplot(6, 4, [10 14]);
-for i=1:neurons_complete_x
-    for j=1:neurons_complete_y
-        projected_activity(i,j) = projection_layer(i,j).rij;
+for idx=1:neurons_complete_x
+    for jdx=1:neurons_complete_y
+        projected_activity(idx,jdx) = projection_layer(idx,jdx).rij;
     end
 end
 mesh([x_population.vi], [y_population.vi], projected_activity);
@@ -401,25 +395,25 @@ set(gca, 'Box', 'off');
 
 % parameters that control the shape of the W connectivity matrix in the
 % intermediate layer 
-We      = 10.0; % short range excitation strength We > Wi
-Wi      = 0.5; % long range inhibition strength 
-sigma_e = 7;    % excitation Gaussian profile sigma_e < sigma_i
-sigma_i = 14;    % inhibiton Gaussian profile
+We      = 10.0;     % short range excitation strength We > Wi
+Wi      = 0.5;      % long range inhibition strength 
+sigma_e = 7;        % excitation Gaussian profile sigma_e < sigma_i
+sigma_i = 14;       % inhibiton Gaussian profile
 W = zeros(neurons_complete_x, neurons_complete_y, neurons_complete_x, neurons_complete_y);
 
 % build the recurrent connectivity matrix
-for i=1:neurons_complete_x
-    for j=1:neurons_complete_y
+for idx=1:neurons_complete_x
+    for jdx = 1:neurons_complete_y
         for k = 1:neurons_complete_x
             for l = 1:neurons_complete_y
-                W(i,j,k,l) = We*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_e^2))) - ...
-                             Wi*(exp(-((i-k)^2+(j-l)^2)/(2*sigma_i^2)));
+                W(idx,jdx,k,l) = We*(exp(-((idx-k)^2+(jdx-l)^2)/(2*sigma_e^2))) - ...
+                                 Wi*(exp(-((idx-k)^2+(jdx-l)^2)/(2*sigma_i^2)));
             end
         end
     end
 end
 
-% % show animated movement of the mexican hat 
+% show animated movement of the mexican hat 
 % for i = 1:neurons_complete_x
 %     for j = 1:neurons_complete_y
 %         surf(W(1:neurons_complete_x, 1:neurons_complete_y, i, j));
@@ -449,8 +443,8 @@ projection_layer_complete_ant = 0;
 
 for t = 1:convergence_steps  
 % loop through the projection layer (intermediate layer)    
-for i=1:neurons_complete_x
-    for j=1:neurons_complete_y
+for idx=1:neurons_complete_x
+    for jdx=1:neurons_complete_y
         % reinit sum for every neuron in the intermediate layer
         sum_rx = 0.0;
         sum_ry = 0.0;
@@ -459,65 +453,65 @@ for i=1:neurons_complete_x
         
         % each input population contribution
         for k = 1:neurons_complete_x
-            sum_rx = sum_rx + J(i,k)*x_population(k).ri;
+            sum_rx = sum_rx + J(idx,k)*x_population(k).ri;
         end
         for l = 1:neurons_complete_y
-            sum_ry = sum_ry + J(j,l)*y_population(l).ri;
+            sum_ry = sum_ry + J(jdx,l)*y_population(l).ri;
         end
         
         % fill in the global activity matrix
-        interm_activities(i,j) = sum_rx + sum_ry;
+        interm_activities(idx,jdx) = sum_rx + sum_ry;
         
         % recurrent connectivity contribution
         for k = 1:neurons_complete_x
             for l = 1:neurons_complete_y
-                if(k~=i && l~=j)
-                    sum_recurrent = sum_recurrent + W(i,j, k, l)*...
+                if(k~=idx && l~=jdx)
+                    sum_recurrent = sum_recurrent + W(idx,jdx, k, l)*...
                                                     interm_activities(k,l);
                 end
             end
         end
         
         % update history of activities
-        sum_hist_rx(i,j) = sum_rx;
-        sum_hist_ry(i,j) = sum_ry;
-        sum_hist_recurrent(i,j) = sum_recurrent;
+        sum_hist_rx(idx,jdx) = sum_rx;
+        sum_hist_ry(idx,jdx) = sum_ry;
+        sum_hist_recurrent(idx,jdx) = sum_recurrent;
         
         % superimpose contributions from both populations and reccurency
-        rxy = interm_activities(i,j) + sum_hist_recurrent(i,j);
+        rxy = interm_activities(idx,jdx) + sum_hist_recurrent(idx,jdx);
         
         % update history for the intermediate layer neurons
-        rxy_hist(i,j) = rxy;
+        rxy_hist(idx,jdx) = rxy;
         
         % normalize the total activity such that we have consistent
         % rate in the intermediate layer bound to [bkg_firing, max_firing]
-        rxy_normed(i,j) = bkg_firing + ...
-            ((rxy_hist(i,j) - min(rxy_hist(:)))*...
+        rxy_normed(idx,jdx) = bkg_firing + ...
+            ((rxy_hist(idx,jdx) - min(rxy_hist(:)))*...
             (max_firing - bkg_firing))/...
             (max(rxy_hist(:) - min(rxy_hist(:))));
-        switch(activation_type)
+        switch(learning_activation_type)
             case 'sigmoid'
                 % compute the activation for each neuron - sigmoid activation
-                rij(i,j) = sigmoid(max_firing, ...
-                                   max_firing/sigmoid_polarity_switch, ...
-                                   rxy_normed(i,j));
+                rij(idx,jdx) = sigmoid(max_firing, ...
+                                       max_firing, ...
+                                       rxy_normed(idx,jdx));
             case 'linear'
                 % compute the activation for each neuron - linear activation
-                rij(i,j) = rxy_normed(i,j);
+                rij(idx,jdx) = rxy_normed(idx,jdx);
         end
         % build up the intermediate projection layer (including recurrency)
-        projection_layer_complete(i,j) = struct('i', i, ...
-                                       'j', j, ...
-                                       'rij', rij(i,j));
+        projection_layer_complete(idx,jdx) = struct('i', idx, ...
+                                                    'j', jdx, ...
+                                                    'rij', rij(idx,jdx));
                                    
         % compute the change in activity
-        rij_dot(i,j) = projection_layer_complete(i,j).rij - projection_layer_complete_ant;
+        rij_dot(idx,jdx) = projection_layer_complete(idx,jdx).rij - projection_layer_complete_ant;
         % integrate activity in time (t->Inf)
-        rij_final(i,j,t) = rij_final_ant + ((rij_dot(i,j) + rij_dot_ant)*.5);
+        rij_final(idx,jdx,t) = rij_final_ant + ((rij_dot(idx,jdx) + rij_dot_ant)*.5);
         % update history 
-        rij_dot_ant = rij_dot(i,j);
-        rij_final_ant = rij_final(i,j,t); 
-        projection_layer_complete_ant = projection_layer_complete(i,j).rij;
+        rij_dot_ant = rij_dot(idx,jdx);
+        rij_final_ant = rij_final(idx,jdx,t); 
+        projection_layer_complete_ant = projection_layer_complete(idx,jdx).rij;
     end
 end
 end % convergence steps
@@ -528,40 +522,41 @@ end % convergence steps
 
 % sum of activity from intermediate layer to output layer
 sum_interm_out = 0; 
-for i=1:neurons_complete_z
+for idx=1:neurons_complete_z
     sum_interm_out = 0;
-    for j = 1:neurons_complete_x
+    for jdx= 1:neurons_complete_x
         for k = 1:neurons_complete_y
             sum_interm_out = sum_interm_out + ...
-                             G_map(z_population(i).vi - phi(x_population(j).vi, y_population(k).vi))*...
-                             (rij_final(j, k, convergence_steps)/neurons_complete_z);
+                             G_map(z_population(idx).vi - phi(x_population(jdx).vi, y_population(k).vi))*...
+                             (rij_final(jdx, k, convergence_steps));
         end
     end
-    z_population(i).ri = sum_interm_out;
+    z_population(idx).ri = sum_interm_out;
 end
 
-% normalize the activity in the output population 
+% normalize the activity in the output population
 z_population_normed = zeros(1, neurons_complete_z);
 min_zpop = min([z_population(:).ri]);
 max_zpop = max([z_population(:).ri]);
-for i = 1:neurons_complete_z
-    z_population_normed(i) = bkg_firing + ...
-            ((z_population(i).ri - min_zpop)*...
+for idx = 1:neurons_complete_z
+    z_population_normed(idx) = bkg_firing + ...
+            ((z_population(idx).ri - min_zpop)*...
             (max_firing - bkg_firing))/...
             (max_zpop - min_zpop);
 end
        
-for i = 1:neurons_complete_z
-    z_population(i).ri  = z_population_normed(i);
+for idx = 1:neurons_complete_z
+    z_population(idx).ri  = z_population_normed(idx);
 end
+
 %% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY (AFTER DYNAMICS)
 % intermediate layer activity after net dynamics relaxed
 projected_activity = zeros(neurons_complete_x, neurons_complete_y);
 
 h(2) = subplot(6, 4, [11 15]);
-for i=1:neurons_complete_x
-    for j=1:neurons_complete_y
-        projected_activity(i,j) = rij_final(i,j,convergence_steps); % final value after relaxation
+for idx=1:neurons_complete_x
+    for jdx=1:neurons_complete_y
+        projected_activity(idx,jdx) = projection_layer_complete(idx,jdx).rij; % final value after relaxation
     end
 end
 mesh([x_population.vi], [y_population.vi], projected_activity);
@@ -575,13 +570,13 @@ linkprop([h(1) h(2)], 'CameraPosition');
 %and the values are settles
 subplot(6, 4, [23 24]);
 % plot the noisy hill of population activity 
-j = 1;
-for i=-z_pop_range:z_pop_range
+jdx = 1;
+for idx=-z_pop_range:z_pop_range
     % display on even spacing of the entire input domain
-    if(rem(i, z_spacing)==0)
-        plot(i, z_population(j).ri, 'o');
+    if(rem(idx, z_spacing)==0)
+        plot(idx, z_population(jdx).ri, 'o');
         hold all;
-        j = j+1;
+        jdx = jdx+1;
     end;
 end;
 % the encoded value in the output population is given by the embedded
