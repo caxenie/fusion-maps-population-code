@@ -18,15 +18,15 @@ clc; close all;
 POPULATION_SIZE         = 50;
 POPULATION_RANGE        = 100;
 POPULATION_SIGMA        = 10;
-POPULATION_MIN_RATE     = 10;
+POPULATION_MIN_RATE     = 0;
 POPULATION_MAX_RATE     = 100;
 POPULATION_NOISE_RATE   = 10;
 
-X_POPULATION_VAL        = 30;
-Y_POPULATION_VAL        = -20;
+X_POPULATION_VAL        = -40;
+Y_POPULATION_VAL        = 10;
 Z_POPULATION_VAL        = 0;
 
-CONVERGENCE_STEPS       = 5;
+CONVERGENCE_STEPS       = 10;
 
 %% Generate first population and initialize
 x_population = generate_population(POPULATION_SIZE, ...
@@ -149,7 +149,7 @@ for idx  = 1:POPULATION_SIZE+1
 end
 %% VISUALIZATION OF INTERMEDIATE LAYER ACTIVITY (ONLY FEEDFORWARD PROP. NORMALIZED)
 % intermediate layer activity
-h(1) = subplot(6, 4, [10 14]);
+h1 = subplot(6, 4, [10 14]);
 surf(rxy_normalized(1:POPULATION_SIZE, 1:POPULATION_SIZE));
 grid off;
 set(gca, 'Box', 'off');  
@@ -160,10 +160,10 @@ set(gca, 'Box', 'off');
 
 % parameters that control the shape of the W connectivity matrix in the
 % intermediate layer 
-We      = 1.2;          % short range excitation strength We > Wi
-Wi      = 0.3;          % long range inhibition strength 
-sigma_e = 10;           % excitation Gaussian profile sigma_e < sigma_i
-sigma_i = 20;           % inhibiton Gaussian profile
+We      = 30;          % short range excitation strength We > Wi
+Wi      = 7;          % long range inhibition strength 
+sigma_e = 2;           % excitation Gaussian profile sigma_e < sigma_i
+sigma_i = 3;           % inhibiton Gaussian profile
 W = zeros(POPULATION_SIZE+1, POPULATION_SIZE+1, POPULATION_SIZE+1, POPULATION_SIZE+1);
 
 % build the recurrent connectivity matrix
@@ -178,7 +178,7 @@ for idx=1:POPULATION_SIZE+1
     end
 end
 
-% show animated movement of the mexican hat
+%show animated movement of the mexican hat
 % figure;
 % for i = 1:POPULATION_SIZE+1
 %     for j = 1:POPULATION_SIZE+1
@@ -194,17 +194,16 @@ rkl             = zeros(POPULATION_SIZE+1, POPULATION_SIZE+1);
 
 % dynamics of the relaxation in the intermediate layer
 
-% rate of change of activity in intermediate layer 
-rij_dot         = zeros(POPULATION_SIZE+1, POPULATION_SIZE+1);
-rij_dot_ant     = zeros(POPULATION_SIZE+1, POPULATION_SIZE+1);
-
 % current activity in the intermediate layer
 rij             = zeros(POPULATION_SIZE+1, POPULATION_SIZE+1);
-rij_ant         = rxy_normalized;
+rij_ant         = zeros(POPULATION_SIZE+1, POPULATION_SIZE+1);
 
 % integrated activity (absolute value) after convergence
 rij_final       = zeros(POPULATION_SIZE+1, POPULATION_SIZE+1);
 rij_final_ant   = zeros(POPULATION_SIZE+1, POPULATION_SIZE+1);
+
+% integration step 
+h = 1;
 
 % run the network
 for t = 1:CONVERGENCE_STEPS
@@ -222,32 +221,41 @@ for idx=1:POPULATION_SIZE+1
                 end
             end
         end
-
+        
         % superimpose contributions from both populations and reccurency
         rij(idx,jdx) = rxy_normalized(idx,jdx) + rkl(idx,jdx);
-        
+    end
+end
         % normalize the total activity
         rij = normalize_activity(rij,...
                                  POPULATION_MIN_RATE, ...
                                  POPULATION_MAX_RATE);
-                                       
+  
+for idx=1:POPULATION_SIZE+1
+    for jdx=1:POPULATION_SIZE+1       
         % compute the activation for each neuron - sigmoid activation
         rij(idx,jdx) = sigmoid(POPULATION_MAX_RATE, ...
-                               POPULATION_MIN_RATE + POPULATION_MAX_RATE/2, ...
+                               75, ...
+                               0.05,...
                                rij(idx,jdx));
      
-        % compute the change in activity
-        rij_dot(idx,jdx) = rij(idx,jdx) - rij_ant(idx, jdx);
+
         
-        % integrate activity in time (t->Inf)
-        rij_final(idx,jdx) = rij_final_ant(idx, jdx) + ((rij_dot(idx,jdx) + rij_dot_ant(idx, jdx))*.5);
-        
+        % integrate activity in time (t->Inf) (External Euler method)
+        rij_final(idx,jdx) = rij_ant(idx, jdx) + h*((rij(idx,jdx) - rij_ant(idx, jdx)));
+                                 
         % update history 
-        rij_ant(idx, jdx) = rij(idx, jdx);
-        rij_dot_ant(idx, jdx) = rij_dot(idx,jdx);
-        rij_final_ant(idx, jdx) = rij_final(idx,jdx); 
-    end
+        rij_ant(idx, jdx) = rij_final(idx, jdx);
+ 
+    end 
 end
+
+      
+        % normalize the final activity
+        rij_final = normalize_activity(rij_final,...
+                                       POPULATION_MIN_RATE, ...
+                                       POPULATION_MAX_RATE);
+                                   
 end % convergence steps
 
 %% FEEDFORWARD CONNECTIVITY FROM INTERMEDIATE LAYER TO OUTPUT POPULATION
@@ -261,7 +269,7 @@ for idx=1:POPULATION_SIZE+1
     for jdx= 1:POPULATION_SIZE+1
         for k = 1:POPULATION_SIZE+1
             sum_interm_out = sum_interm_out + ...
-                             G_map(z_population(idx).vi - phi(x_population(jdx).vi, y_population(k).vi))*...
+                             G_map(0.05, z_population(idx).vi - phi(x_population(jdx).vi, y_population(k).vi))*...
                              (rij_final(jdx, k));
         end
     end
@@ -279,14 +287,14 @@ end
                      
 %% VISUALIZATION OF INTERMEDIATE LAYER AND OUTPUT POPULATION ACTIVITIES (AFTER DYNAMICS)
 % intermediate layer activity after net dynamics relaxed
-h(2) = subplot(6, 4, [11 15]);
+h2 = subplot(6, 4, [11 15]);
 surf(rij_final(1:POPULATION_SIZE, 1:POPULATION_SIZE));
 grid off;
 set(gca, 'Box', 'off');  
 % link axes for the 2 presentations of the intermediate layer activity
-linkprop([h(1) h(2)], 'CameraPosition');
+linkprop([h1 h2], 'CameraPosition');
 
 % plot the encoded value in the output population after the network relaxed
 % and the values are settles
 subplot(6, 4, [23 24]);
-z_population = init_population(z_population, POPULATION_SIZE, 'inferred_output');
+z_population = init_population(z_population, POPULATION_SIZE+1, 'inferred_output');
