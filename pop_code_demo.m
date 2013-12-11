@@ -22,7 +22,7 @@ POPULATION_MIN_RATE     = 0;
 POPULATION_MAX_RATE     = 100;
 POPULATION_NOISE_RATE   = 10;
 
-X_POPULATION_VAL        = -40;
+X_POPULATION_VAL        = 30;
 Y_POPULATION_VAL        = 10;
 Z_POPULATION_VAL        = 0;
 
@@ -111,6 +111,7 @@ end
 % display the feedforward projection weight matrix
 % close all;
 % surf(J(1:POPULATION_SIZE+1, 1:POPULATION_SIZE+1));
+% return;
 
 % stores the summed input activity for each neuron before intermediate layer
 sum_rx = zeros(POPULATION_SIZE+1, POPULATION_SIZE+1);
@@ -230,18 +231,23 @@ end
         rij = normalize_activity(rij,...
                                  POPULATION_MIN_RATE, ...
                                  POPULATION_MAX_RATE);
-  
+
 for idx=1:POPULATION_SIZE+1
     for jdx=1:POPULATION_SIZE+1       
+        % scaling factor of the activity when computing sigmoid
+        scale_f  = 0.05;
+        % threshold rate for the sigmoid
+        threshold_rate = 75;  % spk/s
         % compute the activation for each neuron - sigmoid activation
         rij(idx,jdx) = sigmoid(POPULATION_MAX_RATE, ...
-                               75, ...
-                               0.05,...
+                               threshold_rate, ...
+                               scale_f,...
                                rij(idx,jdx));
-     
-
-        
+         
         % integrate activity in time (t->Inf) (External Euler method)
+        % rij(t) = rij(t-1) + h*(drij(t)/dt)
+        %           or in our case
+        % rij(t) = rij(t-1) + h*(sigmoid(summed_activity(inputs, recurrency)) - rij(t-1))
         rij_final(idx,jdx) = rij_ant(idx, jdx) + h*((rij(idx,jdx) - rij_ant(idx, jdx)));
                                  
         % update history 
@@ -249,8 +255,6 @@ for idx=1:POPULATION_SIZE+1
  
     end 
 end
-
-      
         % normalize the final activity
         rij_final = normalize_activity(rij_final,...
                                        POPULATION_MIN_RATE, ...
