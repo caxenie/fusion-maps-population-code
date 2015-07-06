@@ -1,0 +1,2 @@
+# fusion-maps-population-code
+Demo software usign population code for estimating arbitrary functions. The setup contains 2 input populations each coding some scalar (unimodal) variable which are projected onto a 2D network of units with neurons exhibiting short range excitation and long range inhibition dynamics. The ouput from the intermediate layer is projected to an output population the network has no explicit input and output as each of the populations may be considered inputs / outputs and the processing happens in the intermediate layer. Matlab code prototype.
